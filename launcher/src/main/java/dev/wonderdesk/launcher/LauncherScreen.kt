@@ -214,8 +214,8 @@ fun LauncherScreen() {
         val dockShape = RoundedCornerShape(18.dp)
         // Glass shelf shared by narrow phones and wide tablets: the same
         // component, materials and icon treatment on both. Icons carry a
-        // faded mirror below the shelf floor line and no text labels — the
-        // desktop dock reads the same way. Horizontally scrollable past a
+        // faded mirror below the shelf floor line and skip text labels.
+        // The desktop dock reads the same way. Horizontally scrollable past a
         // phone-width handful so the cap is about shelf room, not an
         // arbitrary number; this is still paint, not compositor blur.
         val dockColors = if (dark) listOf(Color(0xF04A6B8A), Color(0xF02C4A61), Color(0xF01E3547), Color(0xF0314E68))
