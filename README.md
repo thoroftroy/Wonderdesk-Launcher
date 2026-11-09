@@ -1,25 +1,24 @@
 # Wonderdesk Launcher for Android
 
-An independent Android project from Wonderdesk by Rednave. This is the Android HOME launcher; Android system protections still apply.
+Wonderdesk Launcher is a home screen: your apps, dock, folders, widgets and search. By Rednave.
 
-The launcher offers a searchable app drawer with match counts, favorites, dock, folders, widgets, and layout export/import. New default layouts recognize BlissPlayer when installed; existing layouts are not modified. Grid and layout settings remain available on small screens via scrolling.
+## Install and set as home
 
-## Build
+Requires Android 10 or newer (best on Android 13+).
 
-Install JDK 17 or 21 and Android SDK 35, then set `ANDROID_HOME` or configure `sdk.dir` in an untracked `local.properties`. Run:
+1. Copy the APK file to your phone and tap it. Allow "install from unknown sources" when asked.
+2. Press the Home button and choose Wonderdesk when asked which home app to use. To change it later, use the "Default home" button inside the app or Android Settings → Apps → Default apps → Home app.
 
-```sh
-./gradlew :launcher:assembleDebug
-```
+## Using the Launcher
 
-The debug APK is in `launcher/build/outputs/apk/debug/`. It is not a production-signed release. Debug builds use your local Android debug key; they cannot update an existing installation signed with a different key. Back up any important app data before changing signing keys or uninstalling. The application ID is preserved from the Wonderdesk Android monorepo. `versions.json` is a local snapshot; change the relevant app version there when releasing. The catalog and ecosystem version under `shared/src/main/assets/wonderdesk/` are also snapshots, not a live service.
+- The home page holds favorite apps, a clock, folders and widgets; swipe for more pages.
+- Open All apps for the full drawer, or type to search installed apps and calculate.
+- Long-press any app to add it to home or the dock (up to 10 dock apps), or to file it in a folder.
+- Home settings adjusts the grid size, tint and layout; layouts can be exported to a file and restored from one.
+- New default layouts include your music player in the dock when it is installed; your existing layout is never rewritten.
 
-## Appearance
+Widgets depend on the apps that provide them. The launcher cannot replace the lock screen or notification shade, and there are no icon packs or cross-device sync.
 
-Aqua is the default. Open About to choose Aqua, Bliss, Dark Bliss, or Super and adjust motion independently in this app. Aqua and Super have ambient motion and tap bursts when Full motion and Android animations are enabled; Reduced uses smaller bursts with no ambient drift, and Off is still. Type now uses the owner's Bliss, Aqua and Super fonts (Dark Bliss uses the system font), dialogs are themed per look, and Aqua/Super show owner brand art in the header. These Compose adaptations are not yet exact ports of BlissPlayer's dialogs, click effects, or every control. Existing feature and platform limitations are described in the app's About screen. Artwork may still be temporary.
+## Look and feel
 
-The `shared` module is vendored so this repository builds without the monorepo or other Wonderdesk repositories. Changes to shared code must currently be propagated to the other repositories manually. Third-party license notices are in `shared/src/main/assets/licenses/`.
-
-## Publishing privately
-
-In GitHub Desktop choose **File → Add local repository**, select this folder, review the files and create an initial commit. Choose **Publish repository** and ensure **Keep this code private** is checked before publishing. No remote has been configured and nothing is uploaded automatically.
+Open About inside the app to choose between Aqua, Bliss, Dark Bliss and Super, and to adjust motion. Aqua is the default.
