@@ -1,0 +1,7 @@
+<resources>
+    <!-- Show the user's system wallpaper without reading it or requesting storage access. -->
+    <style name="WonderdeskLauncherTheme" parent="WonderdeskTheme">
+        <item name="android:windowShowWallpaper">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+    </style>
+</resources>
