@@ -72,6 +72,23 @@ data class HomeLayout(val favorites: List<String>, val dock: List<String>, val f
     }
 }
 
+/** Defaults only; existing layouts are never rewritten when applications change. */
+fun defaultHomeLayout(values: List<LaunchableApp>, launcherPackage: String): HomeLayout {
+    val preferredPackages = listOf(
+        listOf("dev.wonderdesk.wayfinder"),
+        listOf("com.blissplayer.music", "com.blissplayer.music.debug", "dev.wonderdesk.melody"),
+        listOf("dev.wonderdesk.scribble"),
+        listOf("dev.wonderdesk.abacus")
+    )
+    val dock = preferredPackages.mapNotNull { choices ->
+        choices.firstNotNullOfOrNull { id -> values.firstOrNull { it.component.packageName == id }?.key }
+    }
+    val favorites = values.filter {
+        (it.component.packageName.startsWith("dev.wonderdesk.") || it.component.packageName in listOf("com.blissplayer.music", "com.blissplayer.music.debug")) && it.component.packageName != launcherPackage
+    }.map { it.key }
+    return HomeLayout(favorites, dock, emptyMap())
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun LauncherScreen() {
@@ -94,11 +111,7 @@ fun LauncherScreen() {
     var time by remember { mutableStateOf(LocalDateTime.now()) }
     val byKey = apps.associateBy { it.key }
     fun save(next: HomeLayout) { layout = next; prefs.edit().putString("layout", next.json()).apply() }
-    fun defaults(values: List<LaunchableApp>): HomeLayout {
-        val preferred = listOf("wayfinder", "melody", "scribble", "abacus").mapNotNull { id -> values.firstOrNull { it.component.packageName == "dev.wonderdesk.$id" }?.key }
-        val favorites = values.filter { it.component.packageName.startsWith("dev.wonderdesk.") && it.component.packageName != context.packageName }.map { it.key }
-        return HomeLayout(favorites, preferred, emptyMap())
-    }
+    fun defaults(values: List<LaunchableApp>): HomeLayout = defaultHomeLayout(values, context.packageName)
     fun refresh() { op.run("Reading installed apps", { loadLaunchableApps(context) }) {
         apps = it
         // Reload the saved layout on every resume so direct preference edits
@@ -222,7 +235,7 @@ fun LauncherScreen() {
                 items(dockApps, key = { it.key }) { app ->
                   val interaction = remember(app.key) { MutableInteractionSource() }
                   val pressed by interaction.collectIsPressedAsState()
-                  val scale by animateFloatAsState(if (pressed) 0.92f else 1f, label = "dock press")
+                  val scale by animateFloatAsState(if (pressed && LocalMotion.current == WonderMotion.FULL && android.animation.ValueAnimator.areAnimatorsEnabled()) 0.92f else 1f, label = "dock press")
                   Column(Modifier.widthIn(min = 60.dp).semantics { contentDescription = "Dock ${app.title}" }.combinedClickable(
                     interactionSource = interaction, indication = LocalIndication.current,
                     onClickLabel = "Open ${app.title}", onLongClickLabel = "Organize ${app.title}",
@@ -247,10 +260,12 @@ fun LauncherScreen() {
             Column { Text(time.format(DateTimeFormatter.ofPattern("HH:mm")), style = MaterialTheme.typography.headlineLarge, color = homeText); Text(time.format(DateTimeFormatter.ofPattern("EEEE, MMM d")), color = homeText, style = MaterialTheme.typography.labelMedium) }
             TextButton(onClick = { settings = true }) { Text("Home settings") }
         }
-        OutlinedTextField(query, { query = it.take(512) }, Modifier.fillMaxWidth().background(panelBrush, panelShape), label = { Text("Search installed apps or calculate") }, singleLine = true)
+        OutlinedTextField(query, { query = it.take(512) }, Modifier.fillMaxWidth().background(panelBrush, panelShape), label = { Text("Search installed apps or calculate") }, singleLine = true,
+            trailingIcon = { if (query.isNotEmpty()) TextButton(onClick = { query = "" }) { Text("Clear") } })
         val calculation = remember(query) { runCatching { Expression.format(Expression.evaluate(query)) }.getOrNull() }
         if (calculation != null) Card(Modifier.fillMaxWidth()) { TextButton(onClick = { context.copyText("Calculation result", calculation); op.notice("Result copied") }) { Text("$query = $calculation") } }
         if (allApps) {
+          if (query.isNotBlank() && shown.isEmpty()) Text("No matching apps", color = homeText, style = MaterialTheme.typography.bodySmall)
           AppGrid(Modifier.weight(1f))
         } else if (isWide) {
           Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -307,7 +322,7 @@ fun LauncherScreen() {
         LazyColumn { items(layout.folders[name].orEmpty().mapNotNull(byKey::get), key = { it.key }) { app -> Row { TextButton(onClick = { context.launchApp(app, op::notice) }, Modifier.weight(1f)) { Text(app.title) }; TextButton(onClick = { save(layout.copy(folders = layout.folders + (name to layout.folders[name].orEmpty().filterNot { it == app.key }))) }) { Text("Remove") } } } }
     }, confirmButton = { TextButton(onClick = { openFolder = null }) { Text("Close") } }, dismissButton = { TextButton(onClick = { save(layout.copy(folders = layout.folders - name)); openFolder = null }) { Text("Remove folder only") } }) }
     if (settings) AlertDialog(onDismissRequest = { settings = false }, title = { Text("Home settings") }, text = {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Grid: ${layout.columns} columns")
             Slider(layout.columns.toFloat(), { save(layout.copy(columns = it.toInt())); page = 0 }, valueRange = 3f..6f, steps = 2)
             Row { listOf("blue", "violet", "slate").forEach { tint -> TextButton(onClick = { save(layout.copy(tint = tint)) }) { Text(tint) } } }
