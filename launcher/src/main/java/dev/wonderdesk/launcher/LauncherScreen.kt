@@ -266,6 +266,7 @@ fun LauncherScreen() {
         if (calculation != null) Card(Modifier.fillMaxWidth()) { TextButton(onClick = { context.copyText("Calculation result", calculation); op.notice("Result copied") }) { Text("$query = $calculation") } }
         if (allApps) {
           if (query.isNotBlank() && shown.isEmpty()) Text("No matching apps", color = homeText, style = MaterialTheme.typography.bodySmall)
+          else if (query.isNotBlank()) Text("${shown.size} matching apps", color = homeText, style = MaterialTheme.typography.bodySmall)
           AppGrid(Modifier.weight(1f))
         } else if (isWide) {
           Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
