@@ -2,6 +2,10 @@
 
 Wonderdesk Launcher is a home screen: your apps, dock, folders, widgets and search. By Rednave.
 
+## Easiest install and updates
+
+Get App Hub once from https://github.com/thoroftroy/App-Hub/releases, then use it to install and update this app and the rest of the suite. You will not need to download APKs by hand.
+
 ## Install and set as home
 
 Requires Android 10 or newer (best on Android 13+).
