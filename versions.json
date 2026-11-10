@@ -1,5 +1,5 @@
 {
-  "ecosystem": "0.2.22",
+  "ecosystem": "0.3.0",
   "apps": {
     "wayfinder": "0.2.4",
     "packrat": "0.2.5",
@@ -30,7 +30,7 @@
     "guidebook": "0.2.0",
     "checkup": "0.2.0",
     "fetch": "0.2.0",
-    "launcher": "0.2.16"
+    "launcher": "0.3.0"
   },
   "tools": {
     "installer": "0.2.2",

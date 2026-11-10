@@ -1,23 +1,26 @@
-# Wonderdesk Launcher for Android
+# Wonderdesk Launcher
 
-A home screen for your apps, dock, folders, widgets and search.
+The Wonderdesk home screen: an Aqua-style desktop for your phone.
 
-## Easiest install and updates
+## What it does
 
-Get App Hub once from https://github.com/thoroftroy/App-Hub/releases, then use it to install and update this app and the rest of the suite. You will not need to download APKs by hand.
-## Install and set as home
+- A Mac-style menu bar with the Wonderdesk menu, search and clock.
+- Home pages with your apps, folders and real Android widgets. Hold and drag to move things. Drop one app on another to make a folder.
+- A glass **Dock** that magnifies icons under your finger, and **Launchpad** with all your apps and search.
+- Gestures: swipe up for Launchpad, swipe down for notifications. Double-tap can search, open Beacon or lock the screen.
+- Settings for grid size, icon size, labels, Dock magnification, hidden apps, renaming apps, and exporting or importing your layout.
+- To use it, open it and choose it as your home app (Settings › Home screen).
 
-Install the APK, then press the Home button and pick Wonderdesk. To change it later, use the Default home button inside the app or Android Settings, Apps, Default apps, Home app. Needs Android 10 or newer.
-## Using the Launcher
+## Install and update
 
-- The home page holds favorites, a clock, folders and widgets. Swipe for more pages.
-- All apps opens the drawer. Type to search installed apps or calculate.
-- Long press any app to add it to home or the dock (up to 10 dock apps), or to file it in a folder.
-- Home settings adjust grid size, tint and layout. Layouts export to a file and restore from one.
-- Fresh installs include your music player in the dock when it is installed. Your existing layout is never rewritten.
+The easiest way is Wonderdesk Apphub: get it once from https://github.com/thoroftroy/App-Hub/releases, then install and update this app and the rest of the suite from there.
 
-Widgets come from the apps that provide them. No lock screen replacement, icon packs or cross device sync.
+Or download the APK from this repository's Releases, open it, and allow installing from that source if your phone asks. Needs Android 10 or newer.
 
 ## Look and feel
 
-Open About in the app to change the theme or motion. Aqua is the default. The launcher shows your system wallpaper behind its tinted home surface.
+Every Wonderdesk app follows the look you pick in Control Room (Aqua, Bliss, Dark Bliss or Super). You can give this app its own look in its Settings.
+
+## Privacy
+
+Everything stays on your phone. No accounts, ads or tracking.
