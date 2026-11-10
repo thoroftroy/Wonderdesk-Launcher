@@ -203,10 +203,19 @@ fun LauncherScreen() {
       }
       @Composable
       fun PagerCard() {
-        Row(Modifier.fillMaxWidth().background(panelBrush, panelShape), horizontalArrangement = Arrangement.SpaceBetween) {
-          TextButton(onClick = { page = effectivePage - 1 }, enabled = effectivePage > 0) { Text("Previous") }
-          Text("Page ${effectivePage + 1}/$pageCount", Modifier.padding(top = 14.dp), style = MaterialTheme.typography.labelSmall, color = homeText)
-          TextButton(onClick = { page = effectivePage + 1 }, enabled = effectivePage + 1 < pageCount) { Text("Next") }
+        Row(Modifier.fillMaxWidth().background(panelBrush, panelShape).padding(vertical = 4.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+          TextButton(onClick = { page = effectivePage - 1 }, enabled = effectivePage > 0) { Text("◀") }
+          Row(Modifier.padding(horizontal = 10.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            (0 until pageCount).forEach { index ->
+              val active = index == effectivePage
+              Box(Modifier
+                .size(if (active) 10.dp else 7.dp)
+                .background(Color.White.copy(alpha = if (active) 0.95f else 0.4f), RoundedCornerShape(50))
+                .combinedClickable(onClick = { page = index }, onClickLabel = "Page ${index + 1}")
+              )
+            }
+          }
+          TextButton(onClick = { page = effectivePage + 1 }, enabled = effectivePage + 1 < pageCount) { Text("▶") }
         }
       }
       @Composable
@@ -235,7 +244,8 @@ fun LauncherScreen() {
                 items(dockApps, key = { it.key }) { app ->
                   val interaction = remember(app.key) { MutableInteractionSource() }
                   val pressed by interaction.collectIsPressedAsState()
-                  val scale by animateFloatAsState(if (pressed && LocalMotion.current == WonderMotion.FULL && android.animation.ValueAnimator.areAnimatorsEnabled()) 0.92f else 1f, label = "dock press")
+                  // Aqua dock magnification: the pressed icon grows instead of shrinking.
+                  val scale by animateFloatAsState(if (pressed && LocalMotion.current == WonderMotion.FULL && android.animation.ValueAnimator.areAnimatorsEnabled()) 1.35f else 1f, label = "dock magnify")
                   Column(Modifier.widthIn(min = 60.dp).semantics { contentDescription = "Dock ${app.title}" }.combinedClickable(
                     interactionSource = interaction, indication = LocalIndication.current,
                     onClickLabel = "Open ${app.title}", onLongClickLabel = "Organize ${app.title}",

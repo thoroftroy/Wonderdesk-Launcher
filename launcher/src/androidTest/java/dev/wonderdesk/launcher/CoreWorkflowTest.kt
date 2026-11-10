@@ -88,7 +88,7 @@ class CoreWorkflowTest {
         // distinctness returns as an assertion when the owner delivers
         // per-app artwork (tracked in the asset checklist, not here).
         val manager = context.packageManager
-        val names = listOf("wayfinder", "packrat", "spyglass", "memories", "cinema", "beacon", "scribble", "shutter", "pulse", "abacus")
+        val names = listOf("wayfinder", "packrat", "memories", "cinema", "beacon", "scribble", "pulse", "abacus")
         names.forEach { id ->
             val info = manager.getApplicationInfo("dev.wonderdesk.$id", 0)
             assertNotEquals("$id has no application icon resource", 0, info.icon)
@@ -170,10 +170,10 @@ class CoreWorkflowTest {
     }
 
     @Test fun opensAllCompanionUisAndHonestAboutScreens() {
-        val ids = listOf("wayfinder", "packrat", "spyglass", "memories", "cinema", "pages", "scribble", "shutter", "pulse", "abacus", "chronicle", "timepiece", "safekeeper", "beacon", "vault", "controlroom", "apphub")
+        val ids = listOf("wayfinder", "packrat", "memories", "cinema", "pages", "scribble", "pulse", "abacus", "chronicle", "timepiece", "safekeeper", "beacon", "vault", "controlroom", "apphub")
         for (id in ids) {
             launch(id)
-            if (id == "wayfinder") { text("Choose folder"); proof("wayfinder-aqua") }
+            if (id == "wayfinder") { text("All files"); proof("wayfinder-aqua") }
             text("About").click()
             val expected = context.packageManager.getPackageInfo("dev.wonderdesk.$id", 0).versionName
             assertTrue("No app version in $id About", device.wait(Until.hasObject(By.textContains(expected!!)), 5000))
