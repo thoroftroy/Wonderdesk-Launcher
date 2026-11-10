@@ -10,6 +10,8 @@ The Wonderdesk home screen: an Aqua-style desktop for your phone.
 - Gestures: swipe up for Launchpad, swipe down for notifications. Double-tap can search, open Beacon or lock the screen.
 - Settings for grid size, icon size, labels, Dock magnification, hidden apps, renaming apps, and exporting or importing your layout.
 - To use it, open it and choose it as your home app (Settings › Home screen).
+- Asks to become your home screen and walks you through a quick setup.
+- Icons keep their real shape and transparency, or choose uniform Aqua tiles. Icons are cached, so the home screen is light on the battery.
 
 ## Install and update
 

@@ -31,6 +31,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -108,9 +110,17 @@ class MainActivity : ComponentActivity() {
     override fun onStart() { super.onStart(); runCatching { host.startListening() } }
     override fun onStop() { super.onStop(); runCatching { host.stopListening() } }
     override fun onDestroy() { getSystemService(LauncherApps::class.java).unregisterCallback(callback); super.onDestroy() }
-    override fun onResume() { super.onResume(); Home.loadApps(this) }
+    override fun onResume() { super.onResume(); if (Home.settings.askDefault && !isDefaultHome()) welcome.value = true }
     override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); homePressed.value++ }
-    companion object { val homePressed = mutableIntStateOf(0) }
+    val roleRequest = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { if (!isDefaultHome()) launchSafely(Intent(AndroidSettings.ACTION_HOME_SETTINGS)) {} }
+    /** Asks Android to make Wonderdesk the home app (the system shows its own chooser). */
+    fun requestDefault() {
+        val rm = getSystemService(android.app.role.RoleManager::class.java)
+        if (rm != null && rm.isRoleAvailable(android.app.role.RoleManager.ROLE_HOME) && !rm.isRoleHeld(android.app.role.RoleManager.ROLE_HOME))
+            runCatching { roleRequest.launch(rm.createRequestRoleIntent(android.app.role.RoleManager.ROLE_HOME)) }.onFailure { launchSafely(Intent(AndroidSettings.ACTION_HOME_SETTINGS)) {} }
+        else launchSafely(Intent(AndroidSettings.ACTION_HOME_SETTINGS)) {}
+    }
+    companion object { val homePressed = mutableIntStateOf(0); val welcome = mutableStateOf(false) }
 }
 
 /** Optional: lets the launcher lock the screen on double-tap. */
@@ -123,6 +133,8 @@ class LockService : AccessibilityService() {
 }
 
 /* ---------------------------------------------------- helpers ----------------------------------------------- */
+
+fun Context.isDefaultHome(): Boolean = packageManager.resolveActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), android.content.pm.PackageManager.MATCH_DEFAULT_ONLY)?.activityInfo?.packageName == packageName
 
 fun Context.launch(a: App) = runCatching { getSystemService(LauncherApps::class.java).startMainActivity(a.component, a.user, null, null) }
 fun Context.appInfo(a: App) = runCatching { getSystemService(LauncherApps::class.java).startAppDetailsActivity(a.component, a.user, null, null) }
@@ -154,6 +166,7 @@ fun Desktop(activity: MainActivity) {
     var dragging by remember { mutableStateOf<Item?>(null) }
     var dragOffset by remember { mutableStateOf(Offset.Zero) }
     var dragOrigin by remember { mutableStateOf(Offset.Zero) }
+    var lockGuide by remember { mutableStateOf(false) }
     val home by MainActivity.homePressed
     LaunchedEffect(home) { launchpad = false; folder = null; settingsOpen = false; widgetPicker = false; if (home > 0) pager.animateScrollToPage(0) }
     BackHandler(launchpad || folder != null || settingsOpen) { when { settingsOpen -> settingsOpen = false; folder != null -> folder = null; else -> launchpad = false } }
@@ -161,8 +174,7 @@ fun Desktop(activity: MainActivity) {
         "launchpad" -> launchpad = true
         "search" -> { launchpadSearch = true; launchpad = true }
         "notifications" -> { context.expandNotifications(); Unit }
-        "lock" -> if (LockService.instance?.performGlobalAction(AccessibilityService.GLOBAL_ACTION_LOCK_SCREEN) != true)
-            context.launchSafely(Intent(AndroidSettings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) {} else Unit
+        "lock" -> if (LockService.instance?.performGlobalAction(AccessibilityService.GLOBAL_ACTION_LOCK_SCREEN) != true) lockGuide = true else Unit
         "beacon" -> context.packageManager.getLaunchIntentForPackage("dev.wonderdesk.beacon")?.let { context.launchSafely(it) {} } ?: run { launchpadSearch = true; launchpad = true }
         else -> Unit
     }
@@ -216,6 +228,8 @@ fun Desktop(activity: MainActivity) {
             }
             Dock(onLaunchpad = { launchpad = true })
         }
+        if (lockGuide) AccessGuide(SpecialAccess.Kind.ACCESSIBILITY, "To lock the screen with a gesture, turn on Wonderdesk's “double-tap to lock” accessibility switch. It only locks the screen and reads nothing.",
+            onDismiss = { lockGuide = false }, component = LockService::class.java)
         itemMenu.value?.let { item -> ItemMenu(item, onDismiss = { itemMenu.value = null }, onOpenFolder = { folder = it }) }
         homeMenu?.let { _ ->
             HomeMenu(onDismiss = { homeMenu = null }, onWidgets = { widgetPicker = true }, onSettings = { settingsOpen = true }, onAddPage = {
@@ -227,7 +241,44 @@ fun Desktop(activity: MainActivity) {
         }
         folder?.let { f -> Home.items.find { it.id == f.id } as? Item.Folder }?.let { f -> FolderPopup(f) { folder = null } } ?: run { if (folder != null) folder = null }
         if (widgetPicker) WidgetPicker(activity, pager.currentPage) { widgetPicker = false }
+        if (MainActivity.welcome.value) Welcome(activity, onMore = { MainActivity.welcome.value = false; settingsOpen = true }) { MainActivity.welcome.value = false }
+        if (!Home.ready) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Color.White) }
     }
+}
+
+/* ---------------------------------------------------- welcome ----------------------------------------------- */
+
+/** Shown when Wonderdesk opens but isn't the home app yet: make it default and pick the basics. */
+@Composable
+private fun Welcome(activity: MainActivity, onMore: () -> Unit, onClose: () -> Unit) {
+    val context = LocalContext.current
+    var s by remember { mutableStateOf(Home.settings) }
+    fun set(n: Settings) { val restyle = n.iconStyle != s.iconStyle; s = n; Home.settings = n; Home.save(context); if (restyle) Home.reloadIcons(context) }
+    val isDefault = context.isDefaultHome()
+    WonderDialog(onDismissRequest = onClose, title = { Text("Welcome to Wonderdesk") }, text = {
+        Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("An Aqua desktop for your phone: a magnifying Dock, Launchpad, folders and widgets.", style = MaterialTheme.typography.bodyMedium)
+            if (!isDefault) WButton("Make Wonderdesk my home screen", { activity.requestDefault() }, Modifier.fillMaxWidth(), icon = WonderIcons.Home, kind = ButtonKind.Primary)
+            else Row(verticalAlignment = Alignment.CenterVertically) { Icon(WonderIcons.CheckCircle, null, tint = wonderPalette().success); Spacer(Modifier.width(8.dp)); Text("Wonderdesk is your home screen") }
+            Text("Icons", style = MaterialTheme.typography.titleSmall)
+            Segmented(listOf("Natural", "Aqua tiles"), if (s.iconStyle == "tiles") 1 else 0) { set(s.copy(iconStyle = if (it == 1) "tiles" else "natural")) }
+            Text("Home screen grid", style = MaterialTheme.typography.titleSmall)
+            Segmented(listOf("3×4", "4×5", "4×6", "5×6"), listOf(3 to 4, 4 to 5, 4 to 6, 5 to 6).indexOf(s.cols to s.rows).coerceAtLeast(0)) { i ->
+                val (c, r) = listOf(3 to 4, 4 to 5, 4 to 6, 5 to 6)[i]; set(s.copy(cols = c, rows = r))
+            }
+            Panel {
+                SwitchRow("Magnifying Dock", s.dockMagnify, { set(s.copy(dockMagnify = it)) })
+                PanelDivider()
+                SwitchRow("Menu bar with clock", s.menuBar, { set(s.copy(menuBar = it)) })
+                PanelDivider()
+                SwitchRow("Dark names", s.darkLabels, { set(s.copy(darkLabels = it)) }, subtitle = "For light wallpapers")
+                PanelDivider()
+                ListRow("Choose a wallpaper", icon = WonderIcons.Wallpaper, tint = Color(0xFF8E44AD), chevron = true,
+                    onClick = { context.launchSafely(Intent.createChooser(Intent(Intent.ACTION_SET_WALLPAPER), "Wallpaper")) {} })
+            }
+            SwitchRow("Ask again when Wonderdesk isn't the home app", s.askDefault, { set(s.copy(askDefault = it)) })
+        }
+    }, confirmButton = { TextButton(onClick = onClose) { Text("Done") } }, dismissButton = { TextButton(onClick = onMore) { Text("More settings") } })
 }
 
 private val itemMenu = mutableStateOf<Item?>(null)
@@ -237,8 +288,9 @@ private val itemMenu = mutableStateOf<Item?>(null)
 @Composable
 private fun MenuBar(onApps: () -> Unit, onSearch: () -> Unit, onSettings: () -> Unit, onWidgets: () -> Unit) {
     val context = LocalContext.current
-    var now by remember { mutableStateOf(LocalDateTime.now()) }
-    LaunchedEffect(Unit) { while (true) { now = LocalDateTime.now(); delay(15_000) } }
+    // Flips exactly on the minute, and only while the home screen is visible.
+    val nowMs = rememberNow(60_000)
+    val now = remember(nowMs) { LocalDateTime.now() }
     var orb by remember { mutableStateOf(false) }
     val is24 = android.text.format.DateFormat.is24HourFormat(context)
     Column(Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(Color(0xF2FAFBFC), Color(0xE6E4E7EB)))).statusBarsPadding()) {
@@ -276,7 +328,7 @@ private fun MenuBar(onApps: () -> Unit, onSearch: () -> Unit, onSettings: () -> 
 @Composable
 fun AppIcon(a: App, size: androidx.compose.ui.unit.Dp = (56 * Home.settings.iconScale).dp, label: Boolean = Home.settings.labels, onClick: () -> Unit) {
     Column(Modifier.clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick).padding(4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Image(a.icon.asImageBitmap(), Home.label(a), Modifier.size(size).shadow(4.dp, RoundedCornerShape(size * .22f), clip = false))
+        Image(a.icon, Home.label(a), Modifier.size(size))
         if (label) Text(Home.label(a), Modifier.padding(top = 4.dp).widthIn(max = size + 24.dp), style = labelStyle, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
     }
 }
@@ -288,7 +340,7 @@ private fun FolderIcon(f: Item.Folder, onClick: () -> Unit) {
         Box(Modifier.size(size).clip(RoundedCornerShape(size * .24f)).background(Brush.verticalGradient(listOf(Color(0x99FFFFFF), Color(0x66C8D2DC)))).border(1.dp, Color(0x88FFFFFF), RoundedCornerShape(size * .24f)).padding(size * .1f)) {
             val apps = f.apps.mapNotNull { Home.app(it) }.take(4)
             Column(verticalArrangement = Arrangement.spacedBy(size * .06f)) {
-                apps.chunked(2).forEach { row -> Row(horizontalArrangement = Arrangement.spacedBy(size * .06f)) { row.forEach { Image(it.icon.asImageBitmap(), null, Modifier.size(size * .36f)) } } }
+                apps.chunked(2).forEach { row -> Row(horizontalArrangement = Arrangement.spacedBy(size * .06f)) { row.forEach { Image(it.icon, null, Modifier.size(size * .36f)) } } }
             }
         }
         if (Home.settings.labels) Text(f.name, Modifier.padding(top = 4.dp).widthIn(max = size + 24.dp), style = labelStyle, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
@@ -340,9 +392,9 @@ private fun Dock(onLaunchpad: () -> Unit) {
                     .graphicsLayer { scaleX = anim; scaleY = anim; transformOrigin = androidx.compose.ui.graphics.TransformOrigin(.5f, 1f) }, horizontalAlignment = Alignment.CenterHorizontally) {
                     if (a == null) Box(Modifier.size(base).clip(RoundedCornerShape(12.dp)).background(Brush.verticalGradient(listOf(Color(0xFF6A7A8C), Color(0xFF2E3742)))).clickable(onClick = onLaunchpad),
                         contentAlignment = Alignment.Center) { Icon(WonderIcons.Apps, "Launchpad", tint = Color.White, modifier = Modifier.size(30.dp)) }
-                    else Image(a.icon.asImageBitmap(), Home.label(a), Modifier.size(base).clickable { context.launch(a) })
+                    else Image(a.icon, Home.label(a), Modifier.size(base).clickable { context.launch(a) })
                     // reflection
-                    if (a != null) Image(a.icon.asImageBitmap(), null, Modifier.size(base, 10.dp).graphicsLayer { scaleY = -1f; alpha = .25f }, contentScale = androidx.compose.ui.layout.ContentScale.Crop, alignment = Alignment.BottomCenter)
+                    if (a != null && Home.settings.reflections) Image(a.icon, null, Modifier.size(base, 10.dp).graphicsLayer { scaleY = -1f; alpha = .25f }, contentScale = androidx.compose.ui.layout.ContentScale.Crop, alignment = Alignment.BottomCenter)
                     else Spacer(Modifier.height(10.dp))
                 }
             }
@@ -373,7 +425,7 @@ private fun Launchpad(focusSearch: Boolean, onClose: () -> Unit, onPage: Int) {
                     Box(Modifier.padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
                         Column(Modifier.clip(RoundedCornerShape(12.dp)).pointerInput(a.key) { detectTapGestures(onTap = { context.launch(a); onClose() }, onLongPress = { menuFor = a }) }.padding(4.dp),
                             horizontalAlignment = Alignment.CenterHorizontally) {
-                            Image(a.icon.asImageBitmap(), Home.label(a), Modifier.size(58.dp))
+                            Image(a.icon, Home.label(a), Modifier.size(58.dp))
                             Text(Home.label(a), Modifier.padding(top = 4.dp).width(80.dp), style = MaterialTheme.typography.labelMedium.copy(color = Color.White), maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
                         }
                         DropdownMenu(menuFor == a, { menuFor = null }) {
@@ -408,7 +460,7 @@ private fun FolderPopup(f: Item.Folder, onClose: () -> Unit) {
                     Box {
                         Column(Modifier.clip(RoundedCornerShape(10.dp)).pointerInput(key) { detectTapGestures(onTap = { context.launch(a); onClose() }, onLongPress = { menuFor = key }) }.padding(6.dp),
                             horizontalAlignment = Alignment.CenterHorizontally) {
-                            Image(a.icon.asImageBitmap(), null, Modifier.size(52.dp))
+                            Image(a.icon, null, Modifier.size(52.dp))
                             Text(Home.label(a), style = MaterialTheme.typography.labelSmall.copy(color = Color(0xFF1B1D21)), maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
                         }
                         DropdownMenu(menuFor == key, { menuFor = null }) {
@@ -541,11 +593,27 @@ private fun LauncherSettings(onClose: () -> Unit) {
     val export = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { u -> u?.let { runCatching { context.contentResolver.openOutputStream(it, "wt")!!.use { o -> o.write(Home.exportLayout().toByteArray()) } } } }
     val import = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { u -> u?.let { runCatching { Home.importLayout(context, context.contentResolver.openInputStream(it)!!.bufferedReader().readText()) } } }
     var hiddenOpen by remember { mutableStateOf(false) }
+    var lockGuide by remember { mutableStateOf(false) }
+    if (lockGuide) AccessGuide(SpecialAccess.Kind.ACCESSIBILITY, "To lock the screen with a gesture, Android needs Wonderdesk's “double-tap to lock” accessibility switch on. It only locks the screen and reads nothing.",
+        onDismiss = { lockGuide = false }, component = LockService::class.java)
     WonderApp(appName = "Wonderdesk Launcher", about = "The Wonderdesk home screen: an Aqua desktop with a magnifying Dock, Launchpad, folders, widgets and gestures.", title = "Home screen", onBack = onClose) {
         Page {
             Panel(title = "Default home") {
-                ListRow("Make Wonderdesk your home screen", subtitle = "Choose it in Android's home app setting", icon = WonderIcons.Home, tint = Color(0xFF2E9E44), chevron = true,
-                    onClick = { context.launchSafely(Intent(AndroidSettings.ACTION_HOME_SETTINGS)) {} })
+                val isDefault = context.isDefaultHome()
+                ListRow(if (isDefault) "Wonderdesk is your home screen" else "Make Wonderdesk your home screen", subtitle = if (isDefault) "Change it in Android's home app setting" else "Android will ask you to confirm",
+                    icon = WonderIcons.Home, tint = Color(0xFF2E9E44), chevron = true,
+                    trailing = if (isDefault) ({ Icon(WonderIcons.CheckCircle, null, tint = wonderPalette().success) }) else null,
+                    onClick = { if (isDefault) context.launchSafely(Intent(AndroidSettings.ACTION_HOME_SETTINGS)) {} else (context as? MainActivity)?.requestDefault() })
+                PanelDivider()
+                SwitchRow("Remind me when it isn't", s.askDefault, { set(s.copy(askDefault = it)) })
+            }
+            Panel(title = "Icons", footer = "Natural keeps each icon's own shape and see-through edges. Aqua tiles puts every icon on a rounded glossy tile.") {
+                Column(Modifier.padding(12.dp)) {
+                    Segmented(listOf("Natural", "Aqua tiles"), if (s.iconStyle == "tiles") 1 else 0) { set(s.copy(iconStyle = if (it == 1) "tiles" else "natural")); Home.reloadIcons(context) }
+                }
+                PanelDivider(0.dp)
+                ListRow("Refresh icons", subtitle = "Redraw every icon, e.g. after an icon pack change", icon = WonderIcons.Refresh, tint = Color(0xFF1E7FE8),
+                    onClick = { IconLoader.clearDisk(context); Home.reloadIcons(context) })
             }
             Panel(title = "Layout") {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -564,6 +632,8 @@ private fun LauncherSettings(onClose: () -> Unit) {
             Panel(title = "Dock") {
                 SwitchRow("Magnify icons", s.dockMagnify, { set(s.copy(dockMagnify = it)) }, subtitle = "Icons grow as your finger moves across the Dock")
                 PanelDivider()
+                SwitchRow("Reflections", s.reflections, { set(s.copy(reflections = it)) }, subtitle = "Mirror the icons on the glass shelf")
+                PanelDivider()
                 ListRow("Clear the Dock", icon = WonderIcons.DeleteSweep, tint = Color(0xFF7A7F87), onClick = { Home.dock = emptyList(); Home.save(context) })
             }
             Panel(title = "Gestures") {
@@ -574,7 +644,7 @@ private fun LauncherSettings(onClose: () -> Unit) {
                     Box {
                         ListRow(label, trailing = { Text(gestureName(cur), color = wonderPalette().secondaryText) }, chevron = true, onClick = { open = true })
                         DropdownMenu(open, { open = false }) {
-                            listOf("launchpad", "search", "beacon", "notifications", "lock", "none").forEach { g -> DropdownMenuItem({ Text(gestureName(g)) }, { open = false; setter(g) }) }
+                            listOf("launchpad", "search", "beacon", "notifications", "lock", "none").forEach { g -> DropdownMenuItem({ Text(gestureName(g)) }, { open = false; setter(g); if (g == "lock" && LockService.instance == null) lockGuide = true }) }
                         }
                     }
                 }
@@ -593,7 +663,7 @@ private fun LauncherSettings(onClose: () -> Unit) {
     if (hiddenOpen) WonderDialog(onDismissRequest = { hiddenOpen = false }, title = { Text("Hidden apps") }, text = {
         LazyColumn(Modifier.heightIn(max = 480.dp)) {
             items(Home.apps.sortedBy { Home.label(it).lowercase() }, key = { it.key }) { a ->
-                ListRow(Home.label(a), leading = { Image(a.icon.asImageBitmap(), null, Modifier.size(32.dp)) }, trailing = {
+                ListRow(Home.label(a), leading = { Image(a.icon, null, Modifier.size(32.dp)) }, trailing = {
                     Checkbox(a.key in Home.hidden, { on -> Home.hidden = if (on) Home.hidden + a.key else Home.hidden - a.key; Home.save(context) })
                 })
             }

@@ -9,12 +9,19 @@ import android.os.UserHandle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.core.graphics.drawable.toBitmap
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
 
-data class App(val key: String, val component: ComponentName, val label: String, val icon: Bitmap, val user: UserHandle, val installed: Long) {
+data class App(val key: String, val component: ComponentName, val label: String, val icon: ImageBitmap, val user: UserHandle, val installed: Long) {
     val pkg get() = component.packageName
 }
 
@@ -48,6 +55,8 @@ data class Settings(
     val cols: Int = 4, val rows: Int = 5, val iconScale: Float = 1f, val labels: Boolean = true, val dockMagnify: Boolean = true,
     val dockLabels: Boolean = false, val menuBar: Boolean = true, val pages: Int = 2, val swipeUp: String = "launchpad", val swipeDown: String = "notifications",
     val doubleTap: String = "none", val launchpadSort: String = "name", val darkLabels: Boolean = false,
+    /** "natural" keeps every icon's own shape and transparency; "tiles" puts icons on Aqua tiles. */
+    val iconStyle: String = "natural", val reflections: Boolean = true, val askDefault: Boolean = true,
 )
 
 object Home {
@@ -59,30 +68,64 @@ object Home {
     var settings by mutableStateOf(Settings())
     private var loaded = false
 
-    fun app(key: String) = apps.find { it.key == key }
+    private var byKey by mutableStateOf<Map<String, App>>(emptyMap())
+    fun app(key: String) = byKey[key]
+    /** True once the first icon load finished (the UI shows the layout as soon as this flips). */
+    var ready by mutableStateOf(false)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private var loading: Job? = null
+    private var again = false
     fun label(a: App) = names[a.key] ?: a.label
 
     private fun prefs(c: Context) = c.getSharedPreferences("home", Context.MODE_PRIVATE)
 
+    /**
+     * Reloads the app list in the background. Icons come from [IconLoader]'s disk cache, so this is
+     * cheap; it runs at start and when apps are installed, removed or updated, never on every resume.
+     */
     fun loadApps(c: Context) {
-        val la = c.getSystemService(LauncherApps::class.java)
-        val density = c.resources.displayMetrics.densityDpi
-        val list = la.profiles.flatMap { user ->
-            la.getActivityList(null, user).map { ai ->
-                val key = ai.componentName.flattenToShortString() + if (user != Process.myUserHandle()) "#" + user.hashCode() else ""
-                App(key, ai.componentName, ai.label.toString(), runCatching { ai.getBadgedIcon(density).toBitmap(168, 168) }.getOrElse { Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888) },
-                    user, runCatching { c.packageManager.getPackageInfo(ai.componentName.packageName, 0).firstInstallTime }.getOrDefault(0L))
-            }
-        }.filter { it.pkg != c.packageName || it.component.className.endsWith("SettingsActivity") }.sortedBy { it.label.lowercase() }
-        apps = list
-        // Drop shortcuts to apps that were uninstalled.
-        val keys = list.map { it.key }.toSet()
-        if (loaded) {
-            items = items.mapNotNull { when (it) { is Item.Shortcut -> it.takeIf { s -> s.app in keys }; is Item.Folder -> it.copy(apps = it.apps.filter { a -> a in keys }).takeIf { f -> f.apps.isNotEmpty() }; else -> it } }
-            dock = dock.filter { it in keys }
-            save(c)
+        val ctx = c.applicationContext
+        if (loading?.isActive == true) { again = true; return }
+        loading = scope.launch {
+            do {
+                again = false
+                val style = settings.iconStyle
+                val list = withContext(Dispatchers.Default) { readApps(ctx, style) }
+                apps = list; byKey = list.associateBy { it.key }
+                val keys = list.map { it.key }.toSet()
+                if (list.isNotEmpty()) {
+                    // Drop shortcuts to apps that were uninstalled.
+                    val newItems = items.mapNotNull { when (it) { is Item.Shortcut -> it.takeIf { s -> s.app in keys }; is Item.Folder -> it.copy(apps = it.apps.filter { a -> a in keys }).takeIf { f -> f.apps.isNotEmpty() }; else -> it } }
+                    val newDock = dock.filter { it in keys }
+                    if (newItems != items || newDock != dock) { items = newItems; dock = newDock; save(ctx) }
+                    if (!prefs(ctx).getBoolean("seeded", false)) seed(ctx)
+                }
+                ready = true
+            } while (again)
         }
     }
+
+    private fun readApps(c: Context, style: String): List<App> {
+        val la = c.getSystemService(LauncherApps::class.java)
+        val px = (c.resources.displayMetrics.density * 64).toInt().coerceIn(96, 256)
+        val keep = HashSet<String>()
+        val list = la.profiles.flatMap { user ->
+            la.getActivityList(null, user).mapNotNull { ai ->
+                if (ai.componentName.packageName == c.packageName && !ai.componentName.className.endsWith("SettingsActivity")) return@mapNotNull null
+                val key = ai.componentName.flattenToShortString() + if (user != Process.myUserHandle()) "#" + user.hashCode() else ""
+                val info = runCatching { c.packageManager.getPackageInfo(ai.componentName.packageName, 0) }.getOrNull()
+                val updated = info?.lastUpdateTime ?: 0L
+                keep += IconLoader.fileKey(ai, px, style, updated)
+                val icon = runCatching { IconLoader.load(c, ai, px, style, updated) }.getOrElse { Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888) }
+                App(key, ai.componentName, ai.label.toString(), icon.asImageBitmap(), user, info?.firstInstallTime ?: 0L)
+            }
+        }.sortedBy { it.label.lowercase() }
+        IconLoader.prune(c, keep)
+        return list
+    }
+
+    /** After changing the icon style. */
+    fun reloadIcons(c: Context) { IconLoader.clearMemory(); loadApps(c) }
 
     fun load(c: Context) {
         if (loaded) return
@@ -90,15 +133,15 @@ object Home {
         settings = runCatching { JSONObject(p.getString("settings", "{}")).let { o ->
             Settings(o.optInt("cols", 4), o.optInt("rows", 5), o.optDouble("iconScale", 1.0).toFloat(), o.optBoolean("labels", true), o.optBoolean("magnify", true),
                 o.optBoolean("dockLabels"), o.optBoolean("menuBar", true), o.optInt("pages", 2), o.optString("swipeUp", "launchpad"), o.optString("swipeDown", "notifications"),
-                o.optString("doubleTap", "none"), o.optString("lpSort", "name"), o.optBoolean("darkLabels"))
+                o.optString("doubleTap", "none"), o.optString("lpSort", "name"), o.optBoolean("darkLabels"),
+                o.optString("iconStyle", "natural"), o.optBoolean("reflections", true), o.optBoolean("askDefault", true))
         } }.getOrDefault(Settings())
         items = runCatching { JSONArray(p.getString("items", "[]")).let { a -> (0 until a.length()).mapNotNull { Item.from(a.getJSONObject(it)) } } }.getOrDefault(emptyList())
         dock = runCatching { JSONArray(p.getString("dock", "[]")).let { a -> (0 until a.length()).map { a.getString(it) } } }.getOrDefault(emptyList())
         hidden = p.getStringSet("hidden", emptySet())!!.toSet()
         names = runCatching { JSONObject(p.getString("names", "{}")).let { o -> o.keys().asSequence().associateWith { o.getString(it) } } }.getOrDefault(emptyMap())
-        loadApps(c)
-        if (!p.getBoolean("seeded", false)) seed(c)
         loaded = true
+        loadApps(c)
     }
 
     /** First run: a tidy dock and a first page of the essentials, Wonderdesk apps on page two. */
@@ -131,7 +174,7 @@ object Home {
             .putString("names", JSONObject(names).toString())
             .putString("settings", JSONObject().put("cols", s.cols).put("rows", s.rows).put("iconScale", s.iconScale.toDouble()).put("labels", s.labels).put("magnify", s.dockMagnify)
                 .put("dockLabels", s.dockLabels).put("menuBar", s.menuBar).put("pages", s.pages).put("swipeUp", s.swipeUp).put("swipeDown", s.swipeDown).put("doubleTap", s.doubleTap)
-                .put("lpSort", s.launchpadSort).put("darkLabels", s.darkLabels).toString())
+                .put("lpSort", s.launchpadSort).put("darkLabels", s.darkLabels).put("iconStyle", s.iconStyle).put("reflections", s.reflections).put("askDefault", s.askDefault).toString())
             .apply()
     }
 
