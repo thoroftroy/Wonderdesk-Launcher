@@ -1,6 +1,6 @@
 # Wonderdesk Launcher for Android
 
-A home screen for your apps, dock, folders, widgets and search. By Rednave.
+A home screen for your apps, dock, folders, widgets and search.
 
 ## Easiest install and updates
 
