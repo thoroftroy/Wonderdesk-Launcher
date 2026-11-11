@@ -63,7 +63,7 @@ data class Settings(
     val iconStyle: String = "natural", val reflections: Boolean = true, val askDefault: Boolean = true,
     /** Swiping past the last page wraps to the first, and back. */
     val infinite: Boolean = false, val defaultPage: Int = 0, val lpFoldersFirst: Boolean = true,
-    /** Launchpad and search open Beacon's Launchpad when Beacon is installed. */
+    /** Unused since Beacon became the only all-apps view; kept so older saved settings still load. */
     val beaconLaunchpad: Boolean = true,
     /** Phones keep the home screen upright like Pixel's; tablets always rotate. */
     val rotate: Boolean = false,
@@ -124,8 +124,18 @@ object Home {
                 lastCheck = System.currentTimeMillis()
                 val keys = list.map { it.key }.toSet()
                 if (list.isNotEmpty()) {
-                    val newItems = items.mapNotNull { when (it) { is Item.Shortcut -> it.takeIf { s -> s.app in keys }; is Item.Folder -> it.copy(apps = it.apps.filter { a -> a in keys }).takeIf { f -> f.apps.isNotEmpty() }; else -> it } }
-                    val newDock = dock.filter { it in keys }
+                    // An app that changed its start screen (Beacon did) keeps its place instead of vanishing.
+                    val byPkg = list.groupBy { it.key.substringBefore('/') }.mapValues { it.value.first().key }
+                    fun fix(k: String) = if (k in keys) k else byPkg[k.substringBefore('/')]?.takeIf { '#' !in k } ?: k
+                    val newItems = items.mapNotNull { when (it) { is Item.Shortcut -> it.copy(app = fix(it.app)).takeIf { s -> s.app in keys }; is Item.Folder -> it.copy(apps = it.apps.map(::fix).distinct().filter { a -> a in keys }).takeIf { f -> f.apps.isNotEmpty() }; else -> it } }
+                    var newDock = dock.map(::fix).distinct().filter { it in keys }
+                    groups = groups.map { g -> g.copy(apps = g.apps.map(::fix).distinct()) }
+                    // Beacon is where all your apps live now, so it starts out in the Dock (once; remove it like any app).
+                    val beacon = list.firstOrNull { it.pkg == "dev.wonderdesk.beacon" }?.key
+                    if (beacon != null && !prefs(ctx).getBoolean("beaconDock1", false)) {
+                        if (beacon !in newDock) newDock = (newDock + beacon).takeLast(8)
+                        prefs(ctx).edit().putBoolean("beaconDock1", true).apply()
+                    }
                     val newGroups = groups.map { g -> g.copy(apps = g.apps.filter { it in keys }) }.filter { it.apps.isNotEmpty() }
                     if (newItems != items || newDock != dock || newGroups != groups) { items = newItems; dock = newDock; groups = newGroups; save(ctx) }
                     if (!prefs(ctx).getBoolean("seeded", false)) seed(ctx)
@@ -206,7 +216,7 @@ object Home {
         fun find(vararg pkgs: String) = pkgs.firstNotNullOfOrNull { pk -> apps.firstOrNull { it.pkg == pk }?.key }
         dock = listOfNotNull(find("com.google.android.dialer", "com.android.dialer"), find("com.google.android.apps.messaging", "com.android.messaging"),
             find("org.mozilla.firefox", "com.android.chrome"), find("dev.wonderdesk.wayfinder"), find("dev.wonderdesk.memories", "com.google.android.apps.photos"),
-            find("com.android.camera2", "com.google.android.GoogleCamera")).take(6)
+            find("com.android.camera2", "com.google.android.GoogleCamera"), find("dev.wonderdesk.beacon")).take(7)
         val first = listOfNotNull(find("dev.wonderdesk.chronicle", "com.google.android.calendar"), find("dev.wonderdesk.timepiece", "com.google.android.deskclock"),
             find("dev.wonderdesk.scribble"), find("dev.wonderdesk.controlroom", "com.android.settings"), find("com.android.vending"), find("com.google.android.gm"),
             find("com.google.android.apps.maps"), find("com.google.android.youtube")).filter { it !in dock }.distinct()

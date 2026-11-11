@@ -337,10 +337,10 @@ fun Desktop(activity: MainActivity) {
     BackHandler(launchpad || folder != null || settingsOpen || widgetPicker || wallpaper || movingWidget != null) {
         when { movingWidget != null -> movingWidget = null; wallpaper -> wallpaper = false; widgetPicker -> widgetPicker = false; settingsOpen -> settingsOpen = false; folder != null -> folder = null; else -> launchpad = false }
     }
-    /** Beacon's Launchpad when it's installed (and chosen in Settings), otherwise the built-in one. */
+    /** All your apps live in Beacon. (Only if Beacon isn't installed is there a simple built-in list, so apps can still be found.) */
     fun openLaunchpad(search: Boolean) {
         val beacon = Intent("dev.wonderdesk.beacon.LAUNCHPAD").setPackage("dev.wonderdesk.beacon").putExtra("search", search).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        if (s.beaconLaunchpad && context.packageManager.resolveActivity(beacon, 0) != null) {
+        if (context.packageManager.resolveActivity(beacon, 0) != null) {
             val opts = android.app.ActivityOptions.makeCustomAnimation(context, android.R.anim.fade_in, 0).toBundle()
             if (runCatching { context.startActivity(beacon, opts) }.isSuccess) return
         }
@@ -351,7 +351,7 @@ fun Desktop(activity: MainActivity) {
         "search" -> openLaunchpad(true)
         "notifications" -> { context.expandNotifications(); Unit }
         "lock" -> if (LockService.instance?.performGlobalAction(AccessibilityService.GLOBAL_ACTION_LOCK_SCREEN) != true) lockGuide = true else Unit
-        "beacon" -> context.packageManager.getLaunchIntentForPackage("dev.wonderdesk.beacon")?.let { context.launchSafely(it) {} } ?: run { openLaunchpad(true) }
+        "beacon" -> openLaunchpad(false)
         else -> Unit
     }
 
@@ -405,14 +405,14 @@ fun Desktop(activity: MainActivity) {
         when (h) {
             Hover.Remove -> when (pl) {
                 is Payload.HomeItem -> { (pl.item as? Item.Widget)?.let { activity.host.deleteAppWidgetId(it.widgetId) }; Home.remove(context, pl.item.id); toast.value("Removed from home screen") }
-                is Payload.GridApp -> toast.value("To hide an app, hold it in Launchpad and choose Hide")
+                is Payload.GridApp -> toast.value("To hide an app, hold it in Beacon and choose Hide")
                 else -> removeSource()
             }
             Hover.Uninstall -> key?.let { Home.app(it) }?.let { context.uninstall(it) }
             Hover.Info -> key?.let { Home.app(it) }?.let { context.appInfo(it) }
             is Hover.Dock -> if (key != null) {
                 val without = Home.dock - key
-                if (without.size >= 7 && key !in Home.dock) toast.value("The Dock holds 7 apps") else {
+                if (without.size >= 8 && key !in Home.dock) toast.value("The Dock holds 8 apps") else {
                     if (pl !is Payload.DockApp) removeSource()
                     Home.dock = without.toMutableList().apply { add(h.index.coerceIn(0, size), key) }; Home.save(context)
                 }
@@ -510,7 +510,7 @@ fun Desktop(activity: MainActivity) {
                     }
                 }
             }
-            Dock(drag, onLaunchpad = { openLaunchpad(false) }, onMenu = { dockMenu = it }, haptic = hapticLong)
+            Dock(drag, onMenu = { dockMenu = it }, haptic = hapticLong)
         }
         if (drag.dragging) DropTargets(drag)
         if (movingWidget != null) Text("Tap where the widget should go", Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 40.dp).clip(RoundedCornerShape(20.dp))
@@ -641,7 +641,7 @@ private fun MenuBar(onApps: () -> Unit, onSearch: () -> Unit, onSettings: () -> 
                     Text("Wonderdesk", style = TextStyle(fontWeight = FontWeight.Bold, fontSize = 14.sp, color = ink), maxLines = 1)
                 }
                 DropdownMenu(orb, { orb = false }, Modifier.background(Color(0xF7F5F6F8))) {
-                    DropdownMenuItem({ Text("Launchpad") }, { orb = false; onApps() }, leadingIcon = { Icon(WonderIcons.Apps, null) })
+                    DropdownMenuItem({ Text("All apps (Beacon)") }, { orb = false; onApps() }, leadingIcon = { Icon(WonderIcons.Apps, null) })
                     DropdownMenuItem({ Text("Add a widget…") }, { orb = false; onWidgets() }, leadingIcon = { Icon(WonderIcons.Widgets, null) })
                     DropdownMenuItem({ Text("Desktop & wallpaper…") }, { orb = false; onWallpaper() }, leadingIcon = { Icon(WonderIcons.Wallpaper, null) })
                     HorizontalDivider()
@@ -698,7 +698,7 @@ private fun FolderIcon(f: Item.Folder, open: Boolean) {
 /* ------------------------------------------------------ dock ------------------------------------------------ */
 
 @Composable
-private fun Dock(drag: DragController, onLaunchpad: () -> Unit, onMenu: (String) -> Unit, haptic: () -> Unit) {
+private fun Dock(drag: DragController, onMenu: (String) -> Unit, haptic: () -> Unit) {
     val context = LocalContext.current
     val density = LocalDensity.current
     val apps = Home.dock.mapNotNull { Home.app(it) }
@@ -706,7 +706,7 @@ private fun Dock(drag: DragController, onLaunchpad: () -> Unit, onMenu: (String)
     val insertAt = (drag.hover as? Hover.Dock)?.index
     BoxWithConstraints(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 10.dp, vertical = 6.dp).onGloballyPositioned { drag.dockRect = it.boundsInRoot() }, contentAlignment = Alignment.BottomCenter) {
     // Icons shrink to fit when the Dock is full (room is left for the magnified icon and a drop gap).
-    val slots = apps.size + 1 + if (insertAt != null) 1 else 0
+    val slots = apps.size.coerceAtLeast(1) + if (insertAt != null) 1 else 0
     val base = ((maxWidth - 24.dp) / slots - 6.dp).coerceIn(34.dp, 50.dp)
         Canvas(Modifier.fillMaxWidth().height(40.dp)) {
             val inset = size.width * .04f
@@ -720,7 +720,7 @@ private fun Dock(drag: DragController, onLaunchpad: () -> Unit, onMenu: (String)
             // Watch the finger without taking the touch, so taps and drags still reach each icon.
             awaitPointerEventScope { while (true) { val e = awaitPointerEvent(PointerEventPass.Initial); val c = e.changes.firstOrNull(); touchX = if (c != null && c.pressed && !drag.dragging) c.position.x else null } }
         }, horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.Bottom) {
-            (apps.map<App, App?> { it } + listOf(null)).forEachIndexed { i, a ->
+            (apps.map<App, App?> { it } + if (insertAt == apps.size) listOf(null) else emptyList()).forEachIndexed { i, a ->
                 if (insertAt == i) Spacer(Modifier.width(base))
                 val coords = remember(a?.key) { Coords() }
                 var center by remember { mutableFloatStateOf(0f) }
@@ -729,8 +729,7 @@ private fun Dock(drag: DragController, onLaunchpad: () -> Unit, onMenu: (String)
                 val lifted = drag.dragging && a != null && (drag.payload as? Payload.DockApp)?.key == a.key
                 Column(Modifier.onGloballyPositioned { coords.c = it; center = it.positionInParentX() + it.size.width / 2f; if (a != null) drag.dockCenters[i] = it.boundsInRoot().center.x else drag.dockCenters.remove(i) }
                     .graphicsLayer { scaleX = anim; scaleY = anim; transformOrigin = TransformOrigin(.5f, 1f); alpha = if (lifted) .25f else 1f }, horizontalAlignment = Alignment.CenterHorizontally) {
-                    if (a == null) Box(Modifier.size(base).clip(RoundedCornerShape(12.dp)).background(Brush.verticalGradient(listOf(Color(0xFF6A7A8C), Color(0xFF2E3742)))).clickable(onClick = onLaunchpad),
-                        contentAlignment = Alignment.Center) { Icon(WonderIcons.Apps, "Launchpad", tint = Color.White, modifier = Modifier.size(base * .6f)) }
+                    if (a == null) Spacer(Modifier.size(0.dp, base))
                     else Image(a.icon, Home.label(a), Modifier.size(base).liftable(a.key, coords, drag, { Payload.DockApp(a.key) }, onTap = { context.launch(a) }, onMenu = { onMenu(a.key) }, haptic = haptic))
                     if (a != null && Home.settings.reflections) Image(a.icon, null, Modifier.size(base, 10.dp).graphicsLayer { scaleY = -1f; alpha = .25f }, contentScale = androidx.compose.ui.layout.ContentScale.Crop, alignment = Alignment.BottomCenter)
                     else Spacer(Modifier.height(10.dp))
@@ -851,7 +850,7 @@ private fun GroupPanel(g: Group, drag: DragController, haptic: () -> Unit, onLau
     }
     if (rename) InputDialog("Rename folder", "Name", initial = g.name, onDismiss = { rename = false }) { Home.renameGroup(context, g.id, it) }
     if (add) AppChooser("Add to ${g.name}", already = g.apps.toSet(), onDismiss = { add = false }) { keys -> keys.forEach { Home.addToGroup(context, g.id, it) } }
-    if (confirmDelete) ConfirmDialog("Delete “${g.name}”?", "The apps stay installed and go back into Launchpad.", "Delete folder", onConfirm = { Home.deleteGroup(context, g.id); onClose() }, onDismiss = { confirmDelete = false })
+    if (confirmDelete) ConfirmDialog("Delete “${g.name}”?", "The apps stay installed and go back into the list of all apps.", "Delete folder", onConfirm = { Home.deleteGroup(context, g.id); onClose() }, onDismiss = { confirmDelete = false })
 }
 
 @Composable
@@ -890,11 +889,11 @@ private fun LaunchpadMenu(a: App, page: Int, onDismiss: () -> Unit, onClose: () 
         Column(Modifier.verticalScroll(rememberScrollState())) {
             Panel {
                 ListRow("Add to home screen", icon = WonderIcons.Home, tint = Color(0xFF2E9E44), onClick = { onDismiss(); if (Home.addShortcut(context, a.key, page)) { toast("Added to the home screen"); onClose() } else toast("No room left") }); PanelDivider()
-                if (a.key !in Home.dock) { ListRow("Add to Dock", icon = WonderIcons.Dashboard, tint = Color(0xFF16A085), onClick = { onDismiss(); if (Home.dock.size >= 7) toast("The Dock holds 7 apps") else { Home.dock = Home.dock + a.key; Home.save(context) } }); PanelDivider() }
+                if (a.key !in Home.dock) { ListRow("Add to Dock", icon = WonderIcons.Dashboard, tint = Color(0xFF16A085), onClick = { onDismiss(); if (Home.dock.size >= 8) toast("The Dock holds 8 apps") else { Home.dock = Home.dock + a.key; Home.save(context) } }); PanelDivider() }
                 Home.groups.filter { it.id != inGroup?.id }.forEach { g -> ListRow("Move to “${g.name}”", icon = WonderIcons.Folder, tint = Color(0xFF4A90E2), onClick = { onDismiss(); Home.addToGroup(context, g.id, a.key) }); PanelDivider() }
                 ListRow("New folder with this app", icon = WonderIcons.CreateNewFolder, tint = Color(0xFF4A90E2), onClick = { onDismiss(); onNewGroup() }); PanelDivider()
                 if (inGroup != null) { ListRow("Take out of “${inGroup.name}”", icon = WonderIcons.FolderOpen, tint = Color(0xFF7A7F87), onClick = { onDismiss(); Home.removeFromGroups(context, a.key) }); PanelDivider() }
-                ListRow("Hide from Launchpad", icon = WonderIcons.VisibilityOff, tint = Color(0xFF7A7F87), onClick = { onDismiss(); Home.hidden = Home.hidden + a.key; Home.save(context) }); PanelDivider()
+                ListRow("Hide from all apps", icon = WonderIcons.VisibilityOff, tint = Color(0xFF7A7F87), onClick = { onDismiss(); Home.hidden = Home.hidden + a.key; Home.save(context) }); PanelDivider()
                 ListRow("App info", icon = WonderIcons.Info, tint = Color(0xFF7A7F87), onClick = { onDismiss(); context.appInfo(a) }); PanelDivider()
                 ListRow("Uninstall", icon = WonderIcons.Delete, danger = true, onClick = { onDismiss(); context.uninstall(a) })
             }
@@ -989,7 +988,7 @@ private fun ItemMenu(item: Item, onDismiss: () -> Unit, onOpenFolder: (Item.Fold
             Panel {
                 if (app != null) {
                     ListRow("Open", icon = WonderIcons.OpenInNew, onClick = { onDismiss(); context.launch(app) }); PanelDivider()
-                    if (app.key !in Home.dock && Home.dock.size < 7) { ListRow("Move to Dock", icon = WonderIcons.Dashboard, tint = Color(0xFF16A085), onClick = { onDismiss(); Home.dock = Home.dock + app.key; Home.remove(context, item.id) }); PanelDivider() }
+                    if (app.key !in Home.dock && Home.dock.size < 8) { ListRow("Move to Dock", icon = WonderIcons.Dashboard, tint = Color(0xFF16A085), onClick = { onDismiss(); Home.dock = Home.dock + app.key; Home.remove(context, item.id) }); PanelDivider() }
                     ListRow("Rename", icon = WonderIcons.DriveFileRenameOutline, tint = Color(0xFF8E44AD), onClick = { renaming = true }); PanelDivider()
                     ListRow("App info", icon = WonderIcons.Info, tint = Color(0xFF7A7F87), onClick = { onDismiss(); context.appInfo(app) }); PanelDivider()
                     ListRow("Uninstall", icon = WonderIcons.Delete, danger = true, onClick = { onDismiss(); context.uninstall(app) }); PanelDivider()
@@ -1297,7 +1296,7 @@ private fun Welcome(activity: MainActivity, onMore: () -> Unit, onWallpaper: () 
     val isDefault = context.isDefaultHome()
     WonderDialog(onDismissRequest = onClose, title = { Text("Welcome to Wonderdesk") }, text = {
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("An Aqua desktop for your phone: a magnifying Dock, Launchpad, folders and widgets.", style = MaterialTheme.typography.bodyMedium)
+            Text("An Aqua desktop for your phone: a magnifying Dock, folders, widgets, and Beacon for all your apps.", style = MaterialTheme.typography.bodyMedium)
             if (!isDefault) WButton("Make Wonderdesk my home screen", { activity.requestDefault() }, Modifier.fillMaxWidth(), icon = WonderIcons.Home, kind = ButtonKind.Primary)
             else Row(verticalAlignment = Alignment.CenterVertically) { Icon(WonderIcons.CheckCircle, null, tint = wonderPalette().success); Spacer(Modifier.width(8.dp)); Text("Wonderdesk is your home screen") }
             Text("Icons", style = MaterialTheme.typography.titleSmall)
@@ -1332,7 +1331,7 @@ private fun LauncherSettings(onClose: () -> Unit, onWallpaper: () -> Unit) {
     var confirmReset by remember { mutableStateOf(false) }
     if (lockGuide) AccessGuide(SpecialAccess.Kind.ACCESSIBILITY, "To lock the screen with a gesture, Android needs Wonderdesk's “double-tap to lock” accessibility switch on. It only locks the screen and reads nothing.",
         onDismiss = { lockGuide = false }, component = LockService::class.java)
-    WonderApp(appName = "Wonderdesk Launcher", about = "The Wonderdesk home screen: an Aqua desktop with a magnifying Dock, Launchpad, folders, widgets and gestures.", title = "Home screen", onBack = onClose) {
+    WonderApp(appName = "Wonderdesk Launcher", about = "The Wonderdesk home screen: an Aqua desktop with a magnifying Dock, folders, widgets and gestures. All your apps are in Beacon.", title = "Home screen", onBack = onClose) {
         Page {
             Panel(title = "Default home") {
                 val isDefault = context.isDefaultHome()
@@ -1375,13 +1374,12 @@ private fun LauncherSettings(onClose: () -> Unit, onWallpaper: () -> Unit) {
                     Box {
                         ListRow(label, trailing = { Text(gestureName(cur), color = wonderPalette().secondaryText) }, chevron = true, onClick = { open = true })
                         DropdownMenu(open, { open = false }) {
-                            listOf("launchpad", "search", "beacon", "notifications", "lock", "none").forEach { g -> DropdownMenuItem({ Text(gestureName(g)) }, { open = false; setter(g); if (g == "lock" && LockService.instance == null) lockGuide = true }) }
+                            listOf("launchpad", "search", "notifications", "lock", "none").forEach { g -> DropdownMenuItem({ Text(gestureName(g)) }, { open = false; setter(g); if (g == "lock" && LockService.instance == null) lockGuide = true }) }
                         }
                     }
                 }
             }
-            Panel(title = "Launchpad", footer = "Beacon's Launchpad has the same folders, sorting and hidden apps, plus search for settings, contacts, files and sums. Hold an app there to add it to the home screen or Dock.") {
-                SwitchRow("Use Beacon as Launchpad", s.beaconLaunchpad, { set(s.copy(beaconLaunchpad = it)) }, subtitle = if (installedBeacon(LocalContext.current)) null else "Install Beacon from Wonderdesk Apphub to use it"); PanelDivider()
+            Panel(title = "All apps (Beacon)", footer = if (installedBeacon(LocalContext.current)) "All your apps live in Beacon: swipe up, tap Apps in the menu bar, or tap Beacon in the Dock. Hold an app there to add it to the home screen or Dock." else "Install Beacon from Wonderdesk Apphub to see all your apps with search and folders.") {
                 var sortOpen by remember { mutableStateOf(false) }
                 Box {
                     ListRow("Sort apps", trailing = { Text(SORTS.first { it.first == s.launchpadSort }.second, color = wonderPalette().secondaryText) }, chevron = true, onClick = { sortOpen = true })
@@ -1398,7 +1396,7 @@ private fun LauncherSettings(onClose: () -> Unit, onWallpaper: () -> Unit) {
             }
         }
     }
-    if (confirmReset) ConfirmDialog("Reset the home screen?", "Your pages, folders, Dock and Launchpad folders go back to the default layout. Widgets are removed.", "Reset", onConfirm = { Home.resetLayout(context) }, onDismiss = { confirmReset = false }, danger = true)
+    if (confirmReset) ConfirmDialog("Reset the home screen?", "Your pages, folders, Dock and Beacon folders go back to the default layout. Widgets are removed.", "Reset", onConfirm = { Home.resetLayout(context) }, onDismiss = { confirmReset = false }, danger = true)
     if (hiddenOpen) WonderDialog(onDismissRequest = { hiddenOpen = false }, title = { Text("Hidden apps") }, text = {
         LazyColumn(Modifier.heightIn(max = 480.dp)) {
             items(Home.apps.sortedBy { Home.label(it).lowercase() }, key = { it.key }) { a ->
@@ -1410,4 +1408,4 @@ private fun LauncherSettings(onClose: () -> Unit, onWallpaper: () -> Unit) {
     }, confirmButton = { TextButton(onClick = { hiddenOpen = false }) { Text("Done") } })
 }
 
-private fun gestureName(g: String) = when (g) { "launchpad" -> "Open Launchpad"; "search" -> "Search"; "beacon" -> "Open Beacon"; "notifications" -> "Show notifications"; "lock" -> "Lock screen"; else -> "Nothing" }
+private fun gestureName(g: String) = when (g) { "launchpad", "beacon" -> "Open Beacon (all apps)"; "search" -> "Search with Beacon"; "notifications" -> "Show notifications"; "lock" -> "Lock screen"; else -> "Nothing" }

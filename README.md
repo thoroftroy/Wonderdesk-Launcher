@@ -8,10 +8,9 @@ The Wonderdesk home screen: an Aqua-style desktop for your phone.
 - Home pages with your apps, folders and real Android widgets. Hold and drag to move things, with a grid guide to show where they land. Drop one app on another to make a folder, drag apps back out, and hold at the screen edge to move to another page.
 - Add, remove and rearrange pages, pick a default page, or let pages scroll endlessly.
 - A widget picker with search and previews. Hold a widget and let go to resize, move, edit or remove it, or keep holding and drag it. Apps can add widgets for you (like a Chronicle countdown).
-- Launchpad comes from Beacon when it is installed, so search and folders are the same everywhere.
 - Original Aqua-style wallpapers built in, or use any photo.
-- A glass **Dock** that magnifies icons under your finger, and **Launchpad** with all your apps, folders, six sort orders and Beacon search (including sums and unit conversions). Drag the Dock icons to reorder them.
-- Gestures: swipe up for Launchpad, swipe down for notifications. Double-tap can search, open Beacon or lock the screen.
+- A glass **Dock** (up to 8 apps) that magnifies icons under your finger. Drag icons to reorder them. All your apps live in **Beacon**, with folders, six sort orders and search (including sums and unit conversions).
+- Gestures: swipe up for Beacon (all apps), swipe down for notifications. Double-tap can search or lock the screen.
 - Settings for grid size, icon size, labels, Dock magnification, hidden apps, renaming apps, and exporting or importing your layout.
 - To use it, open it and choose it as your home app (Settings › Home screen).
 - Asks to become your home screen and walks you through a quick setup.

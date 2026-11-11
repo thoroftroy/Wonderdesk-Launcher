@@ -66,7 +66,7 @@ class AppsProvider : ContentProvider() {
             "recordLaunch" -> arg?.let { Home.recordLaunch(c, it) }
             "addToHome" -> return Bundle().apply { putBoolean("ok", arg != null && Home.addShortcut(c, arg, Home.currentPage)) }
             "addToDock" -> { val a = arg ?: return null; if (a in Home.dock) return Bundle().apply { putBoolean("ok", true) }
-                if (Home.dock.size >= 7) return Bundle().apply { putBoolean("ok", false) }; Home.dock = Home.dock + a; Home.save(c) }
+                if (Home.dock.size >= 8) return Bundle().apply { putBoolean("ok", false) }; Home.dock = Home.dock + a; Home.save(c) }
             "hide" -> arg?.let { Home.hidden = Home.hidden + it; Home.save(c) }
             "unhide" -> arg?.let { Home.hidden = Home.hidden - it; Home.save(c) }
             "setSort" -> arg?.let { Home.settings = Home.settings.copy(launchpadSort = it); Home.save(c) }

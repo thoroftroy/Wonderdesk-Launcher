@@ -1,5 +1,13 @@
 # Launcher changelog
 
+## v0.5.1
+
+- There's no separate Launchpad any more: all your apps live in Beacon. The fixed Launchpad button is gone from the Dock, and Beacon sits there as a normal app you can move or remove. Swipe up, Apps in the menu bar and search all open Beacon
+- The Dock holds 8 apps
+- Apps that change their start screen keep their place on the home screen and Dock
+- Much faster and smoother: the app is now built optimised (the way Play Store apps are), so screens open quicker, scrolling is fluid and the APK is about a quarter of the size
+- Screens and lists no longer decode pictures on the main thread, and skip redrawing parts that didn't change
+
 ## v0.5.0
 
 - Launchpad is now Beacon: swipe up, the Dock button and search open Beacon's Launchpad over a blurred home screen, with folders, six sort orders, hidden apps and full search. Turn it off in Settings › Launchpad to use the built-in one
