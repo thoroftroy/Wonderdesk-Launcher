@@ -1,6 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.EXPAND_STATUS_BAR" />
     <uses-permission android:name="android.permission.SET_WALLPAPER" />
+    <!-- Needed for the Uninstall action (Android asks the user to confirm every time). -->
+    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
+    <queries><package android:name="dev.wonderdesk.beacon" /></queries>
     <application android:label="Wonderdesk" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" tools:replace="android:icon,android:roundIcon">
         <activity android:name=".MainActivity" android:theme="@style/WonderdeskLauncherTheme" android:exported="true" android:launchMode="singleTask" android:stateNotNeeded="true"
             android:resizeableActivity="true" android:clearTaskOnLaunch="true" android:excludeFromRecents="true" android:windowSoftInputMode="adjustPan"
@@ -8,6 +11,7 @@
             <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.HOME" /><category android:name="android.intent.category.DEFAULT" /></intent-filter>
             <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
         </activity>
+        <provider android:name=".AppsProvider" android:authorities="dev.wonderdesk.launcher.apps" android:exported="true" />
         <service android:name=".LockService" android:exported="true" android:label="Wonderdesk double-tap to lock" android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
             <intent-filter><action android:name="android.accessibilityservice.AccessibilityService" /></intent-filter>
             <meta-data android:name="android.accessibilityservice" android:resource="@xml/lock_service" />

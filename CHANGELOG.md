@@ -1,5 +1,20 @@
 # Launcher changelog
 
+## v0.4.0
+
+- Home screen rebuilt: drag apps anywhere with a grid guide, drop onto another app to make a folder, drag apps out of folders, and move them between pages by holding at the edge
+- Long-press any app, including the ones placed by default, for a menu; drag it to Remove, App info or Uninstall (Uninstall now works)
+- Reorder the Dock by dragging; icons resize to fit
+- Add and remove pages, arrange them, choose the default page, and turn on endless page scrolling. The launcher remembers the page you were on
+- Launchpad has folders, six ways to sort (name, most used, recently used, newly installed, category) and search powered by Beacon, including sums and unit conversions
+- Wonderdesk apps no longer appear twice; existing layouts are tidied automatically
+- New widget picker with search, previews and sizes. Long-press a widget to resize, move, edit or remove it. If a page is full, the widget goes on the next page and the launcher takes you there
+- Original Aqua-style wallpapers built in, or pick any photo
+- Tap the date in the menu bar to open Chronicle, or the time to open Timepiece
+- Folders open and close with an animation, and app icons refresh by themselves when apps update
+- If the app ever crashes or freezes, a report goes to Control Room so it can be shared and fixed
+- App icon art is larger and fills its tile without being cut off
+
 ## v0.3.1
 
 - Asks to become your home screen when it isn't, with a quick setup for icons, grid, Dock, menu bar and wallpaper

@@ -25,7 +25,7 @@ import java.security.MessageDigest
  *  - "tiles": every icon sits on a rounded Aqua tile (adaptive icons use their own background).
  */
 object IconLoader {
-    private const val VERSION = 4
+    private const val VERSION = 5
     private val memory = HashMap<String, Bitmap>()
 
     fun clearMemory() = synchronized(memory) { memory.clear() }
@@ -93,7 +93,7 @@ object IconLoader {
             android.graphics.BitmapFactory.decodeResource(res, id, opts)
             opts.inSampleSize = maxOf(1, minOf(opts.outWidth, opts.outHeight) / (px * 2))
             opts.inJustDecodeBounds = false
-            android.graphics.BitmapFactory.decodeResource(res, id, opts)
+            android.graphics.BitmapFactory.decodeResource(res, id, opts)?.let { dev.wonderdesk.shared.trimTransparent(it) }
         }.getOrNull()
     }
 
