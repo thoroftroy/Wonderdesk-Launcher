@@ -131,7 +131,12 @@ class MainActivity : ComponentActivity() {
         host = WdWidgetHost(this, HOST_ID)
         Home.load(this)
         getSystemService(LauncherApps::class.java).registerCallback(callback)
+        applyRotation()
         setContent { WonderKitTheme { Desktop(this) } }
+    }
+    fun applyRotation() {
+        val tablet = resources.configuration.smallestScreenWidthDp >= 600
+        requestedOrientation = if (Home.settings.rotate || tablet) android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED else android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
     }
     override fun onStart() { super.onStart(); runCatching { host.startListening() } }
     override fun onStop() { super.onStop(); runCatching { host.stopListening() } }
@@ -139,6 +144,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume(); resumed = true
         Home.refreshIfChanged(this)
+        applyRotation()
         if (Home.settings.askDefault && !isDefaultHome()) welcome.value = true
     }
     override fun onPause() { super.onPause(); resumed = false }
@@ -331,12 +337,21 @@ fun Desktop(activity: MainActivity) {
     BackHandler(launchpad || folder != null || settingsOpen || widgetPicker || wallpaper || movingWidget != null) {
         when { movingWidget != null -> movingWidget = null; wallpaper -> wallpaper = false; widgetPicker -> widgetPicker = false; settingsOpen -> settingsOpen = false; folder != null -> folder = null; else -> launchpad = false }
     }
+    /** Beacon's Launchpad when it's installed (and chosen in Settings), otherwise the built-in one. */
+    fun openLaunchpad(search: Boolean) {
+        val beacon = Intent("dev.wonderdesk.beacon.LAUNCHPAD").setPackage("dev.wonderdesk.beacon").putExtra("search", search).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        if (s.beaconLaunchpad && context.packageManager.resolveActivity(beacon, 0) != null) {
+            val opts = android.app.ActivityOptions.makeCustomAnimation(context, android.R.anim.fade_in, 0).toBundle()
+            if (runCatching { context.startActivity(beacon, opts) }.isSuccess) return
+        }
+        launchpadSearch = search; launchpad = true
+    }
     fun gesture(action: String) = when (action) {
-        "launchpad" -> launchpad = true
-        "search" -> { launchpadSearch = true; launchpad = true }
+        "launchpad" -> openLaunchpad(false)
+        "search" -> openLaunchpad(true)
         "notifications" -> { context.expandNotifications(); Unit }
         "lock" -> if (LockService.instance?.performGlobalAction(AccessibilityService.GLOBAL_ACTION_LOCK_SCREEN) != true) lockGuide = true else Unit
-        "beacon" -> context.packageManager.getLaunchIntentForPackage("dev.wonderdesk.beacon")?.let { context.launchSafely(it) {} } ?: run { launchpadSearch = true; launchpad = true }
+        "beacon" -> context.packageManager.getLaunchIntentForPackage("dev.wonderdesk.beacon")?.let { context.launchSafely(it) {} } ?: run { openLaunchpad(true) }
         else -> Unit
     }
 
@@ -441,7 +456,7 @@ fun Desktop(activity: MainActivity) {
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
-            if (s.menuBar) MenuBar(onApps = { launchpad = true }, onSearch = { launchpadSearch = true; launchpad = true }, onSettings = { settingsOpen = true },
+            if (s.menuBar) MenuBar(onApps = { openLaunchpad(false) }, onSearch = { openLaunchpad(true) }, onSettings = { settingsOpen = true },
                 onWidgets = { widgetPicker = true }, onWallpaper = { wallpaper = true })
             else Spacer(Modifier.statusBarsPadding())
             BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()
@@ -472,7 +487,7 @@ fun Desktop(activity: MainActivity) {
                                     when (item) {
                                         is Item.Shortcut -> Home.app(item.app)?.let { AppIcon(it) }
                                         is Item.Folder -> FolderIcon(item, open = folder?.first == item.id)
-                                        is Item.Widget -> WidgetView(activity, item) { widgetMenu = item }
+                                        is Item.Widget -> WidgetView(activity, item, drag) { widgetMenu = item }
                                     }
                                 }
                             }
@@ -495,7 +510,7 @@ fun Desktop(activity: MainActivity) {
                     }
                 }
             }
-            Dock(drag, onLaunchpad = { launchpad = true }, onMenu = { dockMenu = it }, haptic = hapticLong)
+            Dock(drag, onLaunchpad = { openLaunchpad(false) }, onMenu = { dockMenu = it }, haptic = hapticLong)
         }
         if (drag.dragging) DropTargets(drag)
         if (movingWidget != null) Text("Tap where the widget should go", Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 40.dp).clip(RoundedCornerShape(20.dp))
@@ -830,7 +845,7 @@ private fun GroupPanel(g: Group, drag: DragController, haptic: () -> Unit, onLau
                 Icon(WonderIcons.Delete, "Delete folder", Modifier.clip(CircleShape).clickable { confirmDelete = true }.padding(8.dp), tint = Color.White)
             }
             LazyVerticalGrid(GridCells.Adaptive(84.dp), Modifier.heightIn(max = 460.dp)) {
-                items(Home.sorted(g.apps.mapNotNull { Home.app(it) }, Home.settings.launchpadSort), key = { it.key }) { a -> LaunchpadApp(a, drag, haptic, onLaunch = { onLaunch(a) }, onMenu = { onMenu(a) }) }
+                items(Home.sorted(g.apps.distinct().mapNotNull { Home.app(it) }, Home.settings.launchpadSort), key = { it.key }) { a -> LaunchpadApp(a, drag, haptic, onLaunch = { onLaunch(a) }, onMenu = { onMenu(a) }) }
             }
         }
     }
@@ -938,7 +953,7 @@ private fun FolderPopup(f: Item.Folder, origin: Rect, drag: DragController, hapt
                 Icon(WonderIcons.Add, "Add apps", Modifier.clip(CircleShape).clickable { adding = true }.padding(8.dp), tint = Color(0xFF30343A))
             }
             LazyVerticalGrid(GridCells.Fixed(4), Modifier.heightIn(max = 440.dp)) {
-                items(f.apps, key = { it }) { key ->
+                items(f.apps.distinct(), key = { it }) { key ->
                     val a = Home.app(key) ?: return@items
                     val coords = remember { Coords() }
                     Box {
@@ -1072,13 +1087,18 @@ private fun PagesDialog(current: Int, onGo: (Int) -> Unit, onDelete: (Int) -> Un
     confirm?.let { i -> ConfirmDialog("Remove page ${i + 1}?", "Everything on it is removed from the home screen. The apps stay installed.", "Remove", onConfirm = { onDelete(i) }, onDismiss = { confirm = null }, danger = true) }
 }
 
+private fun installedBeacon(c: Context) = runCatching { c.packageManager.getPackageInfo("dev.wonderdesk.beacon", 0) }.isSuccess
+
 /* ---------------------------------------------------- widgets ----------------------------------------------- */
 
 @Composable
-private fun WidgetView(activity: MainActivity, w: Item.Widget, onLongPress: () -> Unit) {
+private fun WidgetView(activity: MainActivity, w: Item.Widget, drag: DragController? = null, onLongPress: () -> Unit) {
     val context = LocalContext.current
     val mgr = remember { AppWidgetManager.getInstance(context) }
-    val info = remember(w.widgetId) { mgr.getAppWidgetInfo(w.widgetId) }
+    var infoState by remember(w.widgetId) { mutableStateOf(mgr.getAppWidgetInfo(w.widgetId)) }
+    // A widget added by another app (or just bound) can take a moment to become available.
+    LaunchedEffect(w.widgetId) { var tries = 0; while (infoState == null && tries++ < 20) { delay(500); infoState = mgr.getAppWidgetInfo(w.widgetId) } }
+    val info = infoState
     val latest = rememberUpdatedState(onLongPress)
     if (info == null) {
         Box(Modifier.fillMaxSize().padding(6.dp).clip(RoundedCornerShape(14.dp)).background(Color.Black.copy(alpha = .3f)).pointerInput(Unit) { detectTapGestures(onLongPress = { latest.value() }) }, contentAlignment = Alignment.Center) {
@@ -1090,8 +1110,15 @@ private fun WidgetView(activity: MainActivity, w: Item.Widget, onLongPress: () -
         // Touches on a widget belong to the widget, never to the empty-desktop long press.
         awaitPointerEventScope { while (true) { val e = awaitPointerEvent(PointerEventPass.Initial); itemTouch = e.changes.any { it.pressed } } }
     }) {
-        AndroidView({ ctx -> (activity.host.createView(ctx, w.widgetId, info) as WdHostView).apply { setPadding(0, 0, 0, 0); this.onLongPress = { latest.value() } } }, Modifier.fillMaxSize(),
-            update = { v -> (v as? WdHostView)?.let { hv -> hv.onLongPress = { latest.value() } } })
+        val item = rememberUpdatedState(w)
+        fun wire(hv: WdHostView) {
+            hv.onLongPress = { drag?.reset(); latest.value() }
+            hv.onLift = { x, y -> drag?.let { d -> d.payload = Payload.HomeItem(item.value); d.pos = Offset(x, y) } }
+            hv.onDrag = { x, y -> drag?.let { d -> if (!d.dragging) d.dragging = true; d.pos = Offset(x, y) } }
+            hv.onDrop = { drag?.let { d -> if (d.dragging) dropRequested.intValue++ else d.reset() } }
+        }
+        AndroidView({ ctx -> (activity.host.createView(ctx, w.widgetId, info) as? WdHostView ?: WdHostView(ctx).also { it.setAppWidget(w.widgetId, info) }).apply { setPadding(0, 0, 0, 0); wire(this) } }, Modifier.fillMaxSize(),
+            update = { v -> (v as? WdHostView)?.let { wire(it) } })
     }
 }
 
@@ -1282,6 +1309,7 @@ private fun Welcome(activity: MainActivity, onMore: () -> Unit, onWallpaper: () 
             Panel {
                 SwitchRow("Magnifying Dock", s.dockMagnify, { set(s.copy(dockMagnify = it)) }); PanelDivider()
                 SwitchRow("Menu bar with clock", s.menuBar, { set(s.copy(menuBar = it)) }); PanelDivider()
+                SwitchRow("Allow home screen rotation", s.rotate, { set(s.copy(rotate = it)); (context as? MainActivity)?.applyRotation() }, subtitle = "Off keeps the home screen upright when you turn the phone; apps still rotate"); PanelDivider()
                 SwitchRow("Endless page scrolling", s.infinite, { set(s.copy(infinite = it)) }); PanelDivider()
                 ListRow("Choose a wallpaper", subtitle = "Wonderdesk's Aqua wallpapers or a photo", icon = WonderIcons.Wallpaper, tint = Color(0xFF8E44AD), chevron = true, onClick = onWallpaper)
             }
@@ -1328,6 +1356,7 @@ private fun LauncherSettings(onClose: () -> Unit, onWallpaper: () -> Unit) {
                     Slider(s.iconScale, { set(s.copy(iconScale = it)) }, valueRange = .75f..1.3f)
                 }
                 PanelDivider(0.dp)
+                SwitchRow("Allow home screen rotation", s.rotate, { set(s.copy(rotate = it)); (context as? MainActivity)?.applyRotation() }, subtitle = "Off keeps the home screen upright when you turn the phone; apps still rotate"); PanelDivider()
                 SwitchRow("Endless page scrolling", s.infinite, { set(s.copy(infinite = it)) }, subtitle = "Swiping past the last page goes back to the first"); PanelDivider()
                 SwitchRow("Show app names", s.labels, { set(s.copy(labels = it)) }); PanelDivider()
                 SwitchRow("Dark names (for light wallpapers)", s.darkLabels, { set(s.copy(darkLabels = it)) }); PanelDivider()
@@ -1351,7 +1380,8 @@ private fun LauncherSettings(onClose: () -> Unit, onWallpaper: () -> Unit) {
                     }
                 }
             }
-            Panel(title = "Launchpad") {
+            Panel(title = "Launchpad", footer = "Beacon's Launchpad has the same folders, sorting and hidden apps, plus search for settings, contacts, files and sums. Hold an app there to add it to the home screen or Dock.") {
+                SwitchRow("Use Beacon as Launchpad", s.beaconLaunchpad, { set(s.copy(beaconLaunchpad = it)) }, subtitle = if (installedBeacon(LocalContext.current)) null else "Install Beacon from Wonderdesk Apphub to use it"); PanelDivider()
                 var sortOpen by remember { mutableStateOf(false) }
                 Box {
                     ListRow("Sort apps", trailing = { Text(SORTS.first { it.first == s.launchpadSort }.second, color = wonderPalette().secondaryText) }, chevron = true, onClick = { sortOpen = true })

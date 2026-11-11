@@ -1,5 +1,17 @@
 # Launcher changelog
 
+## v0.5.0
+
+- Launchpad is now Beacon: swipe up, the Dock button and search open Beacon's Launchpad over a blurred home screen, with folders, six sort orders, hidden apps and full search. Turn it off in Settings › Launchpad to use the built-in one
+- Widgets can be removed and moved: hold one and let go for its menu (resize, move, edit, remove), or keep holding and drag it to Remove or another spot. Works even with widgets that handle touches themselves
+- Apps can add widgets to the home screen (like Chronicle's “Count down to this”), with a confirm prompt
+- Fixed crashes when Beacon and other apps changed folders or the Dock while the home screen was drawing
+- Widgets added a moment ago no longer show “Widget unavailable”
+- The home screen stays upright when you turn the phone, like Pixel's; turn on “Allow home screen rotation” if you want it to turn
+- Works properly in landscape: tabs move to a rail at the side so the content keeps its height, and screens that ran out of room now scroll
+- If the app ever crashes it says so next time it opens and offers to send a report (only the error, app version and phone model, with file names and links removed). Turn on automatic sending in Control Room › Wonderdesk
+- Lists can no longer crash when two items share a name
+
 ## v0.4.0
 
 - Home screen rebuilt: drag apps anywhere with a grid guide, drop onto another app to make a folder, drag apps out of folders, and move them between pages by holding at the edge
