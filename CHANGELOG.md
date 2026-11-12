@@ -1,5 +1,13 @@
 # Launcher changelog
 
+## v0.5.2
+
+- Apps open by growing out of the icon you tapped
+- Smoother everywhere: new screens, tabs and Settings ease in instead of snapping, and buttons, tabs, chips and switches give a light tap you can feel (following your phone's touch-feedback setting)
+- Android's predictive back: the back gesture shows a live preview of where you're going
+- Widgets are told their real size, so they pick a layout that fits (Wonderdesk widgets and others that support it)
+- Super look: tap sparkles now match Bliss Player: soft glowing sparks with trails, drifting rainbow colours and a faint aurora, instead of big solid circles
+
 ## v0.5.1
 
 - There's no separate Launchpad any more: all your apps live in Beacon. The fixed Launchpad button is gone from the Dock, and Beacon sits there as a normal app you can move or remove. Swipe up, Apps in the menu bar and search all open Beacon

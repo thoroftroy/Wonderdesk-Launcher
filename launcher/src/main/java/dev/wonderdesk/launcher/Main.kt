@@ -176,7 +176,18 @@ class LockService : AccessibilityService() {
 
 fun Context.isDefaultHome(): Boolean = packageManager.resolveActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), android.content.pm.PackageManager.MATCH_DEFAULT_ONLY)?.activityInfo?.packageName == packageName
 
-fun Context.launch(a: App) = runCatching { getSystemService(LauncherApps::class.java).startMainActivity(a.component, a.user, null, null); Home.recordLaunch(this, a.key) }
+/** Where the last tap on an icon landed (window coordinates), so the app can grow out of it. */
+var lastTap: Offset? = null
+
+fun Context.launch(a: App) = runCatching {
+    // Apps open by growing out of the icon you tapped, like a stock launcher.
+    val opts = (this as? android.app.Activity)?.window?.decorView?.let { v -> lastTap?.let { p ->
+        val s = (64 * resources.displayMetrics.density).toInt()
+        android.app.ActivityOptions.makeScaleUpAnimation(v, p.x.toInt() - s / 2, p.y.toInt() - s / 2, s, s).toBundle()
+    } }
+    lastTap = null
+    getSystemService(LauncherApps::class.java).startMainActivity(a.component, a.user, null, opts); Home.recordLaunch(this, a.key)
+}
 fun Context.appInfo(a: App) = runCatching { getSystemService(LauncherApps::class.java).startAppDetailsActivity(a.component, a.user, null, null) }
 fun Context.uninstall(a: App) = launchSafely(Intent(Intent.ACTION_DELETE, Uri.parse("package:${a.pkg}")).putExtra(Intent.EXTRA_USER, a.user).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) {}
 
@@ -245,6 +256,7 @@ private fun Modifier.liftable(key: Any, coords: Coords, drag: DragController, pa
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false)
             itemTouch = true
+            lastTap = coords.c?.takeIf { it.isAttached }?.localToWindow(down.position)
             try {
             var moved = false
             val released: Boolean? = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {

@@ -72,6 +72,14 @@ class WdHostView(context: Context) : AppWidgetHostView(context) {
     }
 
     override fun onDetachedFromWindow() { handler.removeCallbacks(trigger); super.onDetachedFromWindow() }
+
+    /** Tell the widget how big it really is, so it can pick a layout that fits (and nothing is cut off). */
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        if (w <= 0 || h <= 0 || android.os.Build.VERSION.SDK_INT < 31) return
+        val d = resources.displayMetrics.density
+        runCatching { updateAppWidgetSize(android.os.Bundle(), listOf(android.util.SizeF(w / d, h / d))) }
+    }
 }
 
 class WdWidgetHost(context: Context, id: Int) : AppWidgetHost(context, id) {
