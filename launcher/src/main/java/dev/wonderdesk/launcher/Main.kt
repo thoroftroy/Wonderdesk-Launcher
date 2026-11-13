@@ -628,7 +628,8 @@ private fun ToastBar(holder: MutableState<(String) -> Unit>) {
     LaunchedEffect(serial) { if (msg != null) { delay(2600); msg = null } }
     Box(Modifier.fillMaxSize().navigationBarsPadding().padding(bottom = 110.dp), contentAlignment = Alignment.BottomCenter) {
         AnimatedVisibility(msg != null, enter = fadeIn(), exit = fadeOut()) {
-            Text(msg ?: "", Modifier.clip(RoundedCornerShape(20.dp)).background(Color(0xEE2A2D33)).padding(16.dp, 10.dp), color = Color.White, style = MaterialTheme.typography.bodyMedium)
+            val c = rememberPlayerChrome()
+            Text(msg ?: "", Modifier.mediaGlass(c, 20.dp).padding(16.dp, 10.dp), color = c.ink, style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
@@ -642,8 +643,9 @@ private fun MenuBar(onApps: () -> Unit, onSearch: () -> Unit, onSettings: () -> 
     val now = remember(nowMs) { LocalDateTime.now() }
     var orb by remember { mutableStateOf(false) }
     val is24 = android.text.format.DateFormat.is24HourFormat(context)
-    val ink = Color(0xFF1B1D21)
-    Column(Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(Color(0xF2FAFBFC), Color(0xE6E4E7EB)))).statusBarsPadding()) {
+    val pal = wonderPalette()
+    val ink = pal.toolbarText
+    Column(Modifier.fillMaxWidth().background(Brush.verticalGradient(pal.toolbar.take(2).map { it.copy(alpha = .93f) })).statusBarsPadding()) {
         Row(Modifier.fillMaxWidth().height(32.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Box {
                 val art = remember { context.appArt(64) }
@@ -652,7 +654,7 @@ private fun MenuBar(onApps: () -> Unit, onSearch: () -> Unit, onSettings: () -> 
                     Spacer(Modifier.width(6.dp))
                     Text("Wonderdesk", style = TextStyle(fontWeight = FontWeight.Bold, fontSize = 14.sp, color = ink), maxLines = 1)
                 }
-                DropdownMenu(orb, { orb = false }, Modifier.background(Color(0xF7F5F6F8))) {
+                DropdownMenu(orb, { orb = false }, Modifier.background(pal.panel)) {
                     DropdownMenuItem({ Text("All apps (Beacon)") }, { orb = false; onApps() }, leadingIcon = { Icon(WonderIcons.Apps, null) })
                     DropdownMenuItem({ Text("Add a widget…") }, { orb = false; onWidgets() }, leadingIcon = { Icon(WonderIcons.Widgets, null) })
                     DropdownMenuItem({ Text("Desktop & wallpaper…") }, { orb = false; onWallpaper() }, leadingIcon = { Icon(WonderIcons.Wallpaper, null) })
@@ -664,7 +666,7 @@ private fun MenuBar(onApps: () -> Unit, onSearch: () -> Unit, onSettings: () -> 
             }
             Text("Apps", Modifier.clip(RoundedCornerShape(4.dp)).clickable(onClick = onApps).padding(8.dp, 4.dp), style = TextStyle(fontSize = 14.sp, color = ink))
             Spacer(Modifier.weight(1f))
-            Icon(WonderIcons.Search, "Search", Modifier.clip(CircleShape).clickable(onClick = onSearch).padding(6.dp).size(20.dp), tint = Color(0xFF30343A))
+            Icon(WonderIcons.Search, "Search", Modifier.clip(CircleShape).clickable(onClick = onSearch).padding(6.dp).size(20.dp), tint = pal.toolbarIcon)
             // Date opens Chronicle, time opens Timepiece.
             Text(now.format(DateTimeFormatter.ofPattern("EEE d MMM")), Modifier.clip(RoundedCornerShape(4.dp)).clickable {
                 context.openPackageOr("dev.wonderdesk.chronicle", Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_CALENDAR))
@@ -673,7 +675,7 @@ private fun MenuBar(onApps: () -> Unit, onSearch: () -> Unit, onSettings: () -> 
                 context.openPackageOr("dev.wonderdesk.timepiece", Intent(android.provider.AlarmClock.ACTION_SHOW_ALARMS))
             }.padding(6.dp, 4.dp), style = TextStyle(fontSize = 14.sp, color = ink, fontWeight = FontWeight.SemiBold), maxLines = 1)
         }
-        Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0x55000000)))
+        Box(Modifier.fillMaxWidth().height(1.dp).background(pal.toolbarLine.copy(alpha = .7f)))
     }
 }
 
@@ -786,7 +788,7 @@ private fun Launchpad(drag: DragController, focusSearch: Boolean, onClose: () ->
             }
         }
     }
-    Box(Modifier.fillMaxSize().graphicsLayer { alpha = if (hidden) 0f else 1f }.background(Brush.verticalGradient(listOf(Color(0xE6121820), Color(0xF00A0D12))))
+    Box(Modifier.fillMaxSize().graphicsLayer { alpha = if (hidden) 0f else 1f }.background(Brush.verticalGradient(rememberPlayerChrome().backdrop.map { it.copy(alpha = .88f) }))
         .pointerInput(Unit) { detectTapGestures { onClose() } }
         .pointerInput(Unit) { var dy = 0f; detectVerticalDragGestures(onDragEnd = { if (dy > 220) onClose(); dy = 0f }) { _, d -> dy += d } }) {
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 14.dp)) {
@@ -848,7 +850,7 @@ private fun GroupPanel(g: Group, drag: DragController, haptic: () -> Unit, onLau
     BackHandler { onClose() }
     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .35f * p.value)).pointerInput(Unit) { detectTapGestures { onClose() } }, contentAlignment = Alignment.Center) {
         Column(Modifier.padding(20.dp).widthIn(max = 460.dp).graphicsLayer { scaleX = .85f + .15f * p.value; scaleY = .85f + .15f * p.value; alpha = p.value }
-            .clip(RoundedCornerShape(22.dp)).background(Color(0xE6232A33)).border(1.dp, Color.White.copy(alpha = .25f), RoundedCornerShape(22.dp))
+            .mediaGlass(rememberPlayerChrome(), 22.dp, hud = true)
             .pointerInput(Unit) { detectTapGestures { } }.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(g.name, Modifier.weight(1f).clickable { rename = true }, style = MaterialTheme.typography.titleLarge.copy(color = Color.White, fontWeight = FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -867,7 +869,7 @@ private fun GroupPanel(g: Group, drag: DragController, haptic: () -> Unit, onLau
 
 @Composable
 private fun SearchResults(apps: List<App>, hits: List<BeaconHit>, onHit: (BeaconHit) -> Unit, appItem: @Composable (App) -> Unit) {
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
+    LazyColumn(Modifier.fillMaxSize(), state = rememberTabTopList(), contentPadding = PaddingValues(bottom = 24.dp)) {
         hits.filter { it.kind == "math" || it.kind == "convert" }.forEach { h ->
             item { Column(Modifier.fillMaxWidth().padding(vertical = 8.dp).clip(RoundedCornerShape(14.dp)).background(Color.White.copy(alpha = .12f)).clickable { onHit(h) }.padding(16.dp)) {
                 Text(h.subtitle, color = Color.White.copy(alpha = .7f), style = MaterialTheme.typography.bodyMedium)
@@ -957,11 +959,11 @@ private fun FolderPopup(f: Item.Folder, origin: Rect, drag: DragController, hapt
         val oy = if (origin == Rect.Zero || screen.height == 0f) .5f else (origin.center.y / screen.height).coerceIn(0f, 1f)
         Column(Modifier.padding(24.dp).widthIn(max = 420.dp)
             .graphicsLayer { val sc = .2f + .8f * prog.value; scaleX = sc; scaleY = sc; alpha = prog.value.coerceIn(0f, 1f); transformOrigin = TransformOrigin(ox, oy) }
-            .clip(RoundedCornerShape(22.dp)).background(Brush.verticalGradient(listOf(Color(0xEEE9EDF2), Color(0xE6CDD5DE))))
-            .border(1.dp, Color(0xAAFFFFFF), RoundedCornerShape(22.dp)).pointerInput(Unit) { detectTapGestures { } }.padding(18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            .clip(RoundedCornerShape(22.dp)).background(Brush.verticalGradient(listOf(wonderPalette().panel.copy(alpha = .95f), wonderPalette().window.copy(alpha = .92f))))
+            .border(1.dp, wonderPalette().panelBorder, RoundedCornerShape(22.dp)).pointerInput(Unit) { detectTapGestures { } }.padding(18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(f.name, Modifier.weight(1f).clickable { renaming = true }.padding(bottom = 10.dp), style = MaterialTheme.typography.titleLarge.copy(color = Color(0xFF1B1D21), fontWeight = FontWeight.SemiBold), textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Icon(WonderIcons.Add, "Add apps", Modifier.clip(CircleShape).clickable { adding = true }.padding(8.dp), tint = Color(0xFF30343A))
+                Text(f.name, Modifier.weight(1f).clickable { renaming = true }.padding(bottom = 10.dp), style = MaterialTheme.typography.titleLarge.copy(color = wonderPalette().text, fontWeight = FontWeight.SemiBold), textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Icon(WonderIcons.Add, "Add apps", Modifier.clip(CircleShape).clickable { adding = true }.padding(8.dp), tint = wonderPalette().accent)
             }
             LazyVerticalGrid(GridCells.Fixed(4), Modifier.heightIn(max = 440.dp)) {
                 items(f.apps.distinct(), key = { it }) { key ->
@@ -971,7 +973,7 @@ private fun FolderPopup(f: Item.Folder, origin: Rect, drag: DragController, hapt
                         Column(Modifier.padding(4.dp).onGloballyPositioned { coords.c = it }.liftable(key, coords, drag, { Payload.FolderApp(f.id, key) }, onTap = { context.launch(a); close() }, onMenu = { menuFor = key }, haptic = haptic),
                             horizontalAlignment = Alignment.CenterHorizontally) {
                             Image(a.icon, null, Modifier.size(52.dp))
-                            Text(Home.label(a), style = MaterialTheme.typography.labelSmall.copy(color = Color(0xFF1B1D21)), maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+                            Text(Home.label(a), style = MaterialTheme.typography.labelSmall.copy(color = wonderPalette().text), maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
                         }
                         DropdownMenu(menuFor == key, { menuFor = null }) {
                             DropdownMenuItem({ Text("Take out of folder") }, { menuFor = null; removeFromFolder(context, f.id, key); Home.addShortcut(context, key, f.page, f.x to f.y) })
@@ -981,7 +983,7 @@ private fun FolderPopup(f: Item.Folder, origin: Rect, drag: DragController, hapt
                     }
                 }
             }
-            Text("Hold an app and drag it out to move it", Modifier.padding(top = 8.dp), style = MaterialTheme.typography.labelSmall, color = Color(0xFF5E636A))
+            Text("Hold an app and drag it out to move it", Modifier.padding(top = 8.dp), style = MaterialTheme.typography.labelSmall, color = wonderPalette().secondaryText)
         }
     }
     if (renaming) InputDialog("Rename folder", "Name", initial = f.name, onDismiss = { renaming = false }) { Home.update(context, f.copy(name = it)) }
@@ -1201,7 +1203,7 @@ private fun WidgetPicker(activity: MainActivity, page: Int, onDismiss: () -> Uni
         Column(Modifier.fillMaxSize()) {
             SearchField(q, { q = it }, "Search widgets", Modifier.padding(16.dp, 12.dp))
             if (byApp.isEmpty()) EmptyState("No widgets found", if (q.isBlank()) "Apps you install can add widgets here." else "Nothing matches “$q”.", icon = WonderIcons.Widgets)
-            LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp, 0.dp, 16.dp, 24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            LazyColumn(Modifier.fillMaxSize(), state = rememberTabTopList(), contentPadding = PaddingValues(16.dp, 0.dp, 16.dp, 24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 items(byApp, key = { it.first }) { (pkg, list) ->
                     Panel(title = appName(context, pkg)) {
                         list.forEachIndexed { i, pr ->
@@ -1331,6 +1333,13 @@ private fun Welcome(activity: MainActivity, onMore: () -> Unit, onWallpaper: () 
 
 /* ---------------------------------------------------- settings ---------------------------------------------- */
 
+/** What Android must allow for the launcher to work fully. */
+private val APP_NEEDS by lazy { listOf(
+    WonderNeed("Default home app", "Makes the Home button and gesture open Wonderdesk", check = { c -> c.getSystemService(android.app.role.RoleManager::class.java)?.isRoleHeld(android.app.role.RoleManager.ROLE_HOME) ?: true },
+        fix = { c -> c.launchSafely(android.content.Intent(android.provider.Settings.ACTION_HOME_SETTINGS).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) {} }),
+    WonderNeed("Double-tap to lock", "Locks the screen when you double-tap the home screen", required = false, access = SpecialAccess.Kind.ACCESSIBILITY, component = LockService::class.java),
+) }
+
 @Composable
 private fun LauncherSettings(onClose: () -> Unit, onWallpaper: () -> Unit) {
     val context = LocalContext.current
@@ -1343,7 +1352,7 @@ private fun LauncherSettings(onClose: () -> Unit, onWallpaper: () -> Unit) {
     var confirmReset by remember { mutableStateOf(false) }
     if (lockGuide) AccessGuide(SpecialAccess.Kind.ACCESSIBILITY, "To lock the screen with a gesture, Android needs Wonderdesk's “double-tap to lock” accessibility switch on. It only locks the screen and reads nothing.",
         onDismiss = { lockGuide = false }, component = LockService::class.java)
-    WonderApp(appName = "Wonderdesk Launcher", about = "The Wonderdesk home screen: an Aqua desktop with a magnifying Dock, folders, widgets and gestures. All your apps are in Beacon.", title = "Home screen", onBack = onClose) {
+    WonderApp(needs = APP_NEEDS, appName = "Wonderdesk Launcher", about = "The Wonderdesk home screen: an Aqua desktop with a magnifying Dock, folders, widgets and gestures. All your apps are in Beacon.", title = "Home screen", onBack = onClose) {
         Page {
             Panel(title = "Default home") {
                 val isDefault = context.isDefaultHome()
