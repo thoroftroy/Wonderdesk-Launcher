@@ -1,12 +1,16 @@
 # Launcher changelog
 
+## v0.5.4
+
+- Icon packs: Home screen settings › Icon pack works with any pack made for Nova, Lawnchair and other launchers. Apps a pack doesn't cover keep their own icon
+- Fixes from a full round of stress testing on every screen
+
 ## v0.5.3
 
 - Switches Android greys out as a “Restricted setting” are now explained: the guide walks you through unlocking them in three clear steps, and keeps showing them until the switch is really on (before, on Android 15 and newer it could hide the only hint)
 - Tap the tab you're already on to glide back to the top of its list
 - The menu bar, folders, app list and messages follow your look instead of always being light grey
 - Nothing required stays hidden: if Android is blocking something the app needs, a slim banner says what and takes you straight to the switch, and Settings › Permissions and access lists everything with its state
-- Icon packs: Home screen settings › Icon pack works with any pack made for Nova, Lawnchair and other launchers. Apps a pack doesn't cover keep their own icon
 
 ## v0.5.2
 
