@@ -6,6 +6,7 @@
 - Tap the tab you're already on to glide back to the top of its list
 - The menu bar, folders, app list and messages follow your look instead of always being light grey
 - Nothing required stays hidden: if Android is blocking something the app needs, a slim banner says what and takes you straight to the switch, and Settings › Permissions and access lists everything with its state
+- Icon packs: Home screen settings › Icon pack works with any pack made for Nova, Lawnchair and other launchers. Apps a pack doesn't cover keep their own icon
 
 ## v0.5.2
 

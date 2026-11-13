@@ -1306,7 +1306,7 @@ private fun WallpaperPicker(onClose: () -> Unit) {
 private fun Welcome(activity: MainActivity, onMore: () -> Unit, onWallpaper: () -> Unit, onClose: () -> Unit) {
     val context = LocalContext.current
     var s by remember { mutableStateOf(Home.settings) }
-    fun set(n: Settings) { val restyle = n.iconStyle != s.iconStyle; s = n; Home.settings = n; Home.save(context); if (restyle) Home.reloadIcons(context) }
+    fun set(n: Settings) { val restyle = n.iconStyle != s.iconStyle || n.iconPack != s.iconPack; s = n; Home.settings = n; Home.save(context); if (restyle) Home.reloadIcons(context) }
     val isDefault = context.isDefaultHome()
     WonderDialog(onDismissRequest = onClose, title = { Text("Welcome to Wonderdesk") }, text = {
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -1366,6 +1366,23 @@ private fun LauncherSettings(onClose: () -> Unit, onWallpaper: () -> Unit) {
             Panel(title = "Icons", footer = "Natural keeps each icon's own shape and see-through edges. Aqua tiles puts every icon on a rounded glossy tile.") {
                 Column(Modifier.padding(12.dp)) { Segmented(listOf("Natural", "Aqua tiles"), if (s.iconStyle == "tiles") 1 else 0) { set(s.copy(iconStyle = if (it == 1) "tiles" else "natural")); Home.reloadIcons(context) } }
                 PanelDivider(0.dp)
+                PanelDivider()
+                var packs by remember { mutableStateOf<List<Pair<String, String>>?>(null) }
+                LaunchedEffect(Unit) { packs = withContext(Dispatchers.IO) { IconPack.installed(context) } }
+                var choosePack by remember { mutableStateOf(false) }
+                ListRow("Icon pack", subtitle = packs?.find { it.first == s.iconPack }?.second ?: if (s.iconPack.isBlank()) "Apps' own icons" else "Pack not installed",
+                    icon = WonderIcons.Palette, tint = Color(0xFF8E44AD), chevron = true, onClick = { choosePack = true })
+                if (choosePack) WonderDialog(onDismissRequest = { choosePack = false }, title = { Text("Icon pack") }, text = {
+                    Column(Modifier.heightIn(max = 480.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Panel {
+                            ListRow("Apps' own icons", selected = s.iconPack.isBlank(), onClick = { set(s.copy(iconPack = "")); choosePack = false })
+                            packs.orEmpty().forEach { (pk, name) -> PanelDivider(16.dp); ListRow(name, selected = s.iconPack == pk, onClick = { set(s.copy(iconPack = pk)); choosePack = false }) }
+                        }
+                        Text(if (packs.isNullOrEmpty()) "No icon packs installed. Any pack made for Nova, Lawnchair or other launchers works: install one from your app store and it appears here."
+                            else "Apps the pack doesn't cover keep their own icon. Wonderdesk apps keep their artwork.", style = MaterialTheme.typography.bodySmall, color = wonderPalette().secondaryText)
+                    }
+                }, confirmButton = { TextButton(onClick = { choosePack = false }) { Text("Close") } })
+                PanelDivider()
                 ListRow("Refresh icons", subtitle = "Redraw every icon now", icon = WonderIcons.Refresh, tint = Color(0xFF1E7FE8), onClick = { IconLoader.clearDisk(context); Home.reloadIcons(context) })
             }
             Panel(title = "Layout") {

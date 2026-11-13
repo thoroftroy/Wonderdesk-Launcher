@@ -61,7 +61,11 @@ object IconLoader {
         val canvas = Canvas(out)
         val pad = px * .06f
         val box = RectF(pad, pad * .6f, px - pad, px - pad * 1.4f)   // leave room for the shadow below
-        val art: Bitmap = suiteArt(c, pkg, px)?.let { a ->
+        // Style may carry an icon pack: "natural|pack:com.example.icons".
+        val pack = style.substringAfter("|pack:", "")
+        val packIcon = if (pack.isNotBlank() && !pkg.startsWith("dev.wonderdesk.")) IconPack.icon(c, pack, ai.componentName, density) else null
+        @Suppress("NAME_SHADOWING") val style = style.substringBefore("|")
+        val art: Bitmap = packIcon?.let { fittedDrawable(it, px) } ?: suiteArt(c, pkg, px)?.let { a ->
             if (style == "tiles") tile(px) { cv, r -> drawFitted(cv, BitmapDrawable(c.resources, a), r.insetBy(.14f)) } else fitted(a, px)
         } ?: run {
             val d = runCatching { ai.getIcon(density) }.getOrNull() ?: c.packageManager.defaultActivityIcon
