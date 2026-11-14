@@ -254,6 +254,22 @@ private var itemTouch = false
  * Tap, long-press (menu) and long-press-then-drag on one element, the same way everywhere:
  * home icons, folders, the Dock, Launchpad and folder popups.
  */
+/** The Dock app you just opened: it bounces like an app launching on a Mac. */
+private val dockBouncing = mutableStateOf<Pair<String, Long>?>(null)
+
+private fun Modifier.dockBounce(key: String): Modifier = composed {
+    val y = remember { androidx.compose.animation.core.Animatable(0f) }
+    val b = dockBouncing.value
+    LaunchedEffect(b) {
+        if (b?.first != key) return@LaunchedEffect
+        repeat(2) {
+            y.animateTo(-1f, androidx.compose.animation.core.tween(170, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+            y.animateTo(0f, androidx.compose.animation.core.tween(190, easing = androidx.compose.animation.core.LinearOutSlowInEasing))
+        }
+    }
+    graphicsLayer { translationY = y.value * 22.dp.toPx() }
+}
+
 /** The icon under your finger, so it can sink in like a button (and spring back). */
 private val pressedIcon = mutableStateOf<Any?>(null)
 
@@ -764,7 +780,7 @@ private fun Dock(drag: DragController, onMenu: (String) -> Unit, haptic: () -> U
                 Column(Modifier.onGloballyPositioned { coords.c = it; center = it.positionInParentX() + it.size.width / 2f; if (a != null) drag.dockCenters[i] = it.boundsInRoot().center.x else drag.dockCenters.remove(i) }
                     .graphicsLayer { scaleX = anim; scaleY = anim; transformOrigin = TransformOrigin(.5f, 1f); alpha = if (lifted) .25f else 1f }, horizontalAlignment = Alignment.CenterHorizontally) {
                     if (a == null) Spacer(Modifier.size(0.dp, base))
-                    else Image(a.icon, Home.label(a), Modifier.size(base).liftable(a.key, coords, drag, { Payload.DockApp(a.key) }, onTap = { context.launch(a) }, onMenu = { onMenu(a.key) }, haptic = haptic))
+                    else Image(a.icon, Home.label(a), Modifier.size(base).dockBounce(a.key).liftable(a.key, coords, drag, { Payload.DockApp(a.key) }, onTap = { dockBouncing.value = a.key to System.nanoTime(); android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ context.launch(a) }, 180) }, onMenu = { onMenu(a.key) }, haptic = haptic))
                     if (a != null && Home.settings.reflections) Image(a.icon, null, Modifier.size(base, 10.dp).graphicsLayer { scaleY = -1f; alpha = .25f }, contentScale = androidx.compose.ui.layout.ContentScale.Crop, alignment = Alignment.BottomCenter)
                     else Spacer(Modifier.height(10.dp))
                 }
