@@ -60,6 +60,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -253,11 +254,17 @@ private var itemTouch = false
  * Tap, long-press (menu) and long-press-then-drag on one element, the same way everywhere:
  * home icons, folders, the Dock, Launchpad and folder popups.
  */
-private fun Modifier.liftable(key: Any, coords: Coords, drag: DragController, payload: () -> Payload, onTap: () -> Unit, onMenu: () -> Unit, onDragStart: () -> Unit = {}, haptic: () -> Unit) =
-    pointerInput(key) {
+/** The icon under your finger, so it can sink in like a button (and spring back). */
+private val pressedIcon = mutableStateOf<Any?>(null)
+
+private fun Modifier.liftable(key: Any, coords: Coords, drag: DragController, payload: () -> Payload, onTap: () -> Unit, onMenu: () -> Unit, onDragStart: () -> Unit = {}, haptic: () -> Unit) = composed {
+    val sc by androidx.compose.animation.core.animateFloatAsState(if (pressedIcon.value == key) .86f else 1f,
+        androidx.compose.animation.core.spring(dampingRatio = .55f, stiffness = 700f), label = "press")
+    graphicsLayer { scaleX = sc; scaleY = sc }.pointerInput(key) {
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false)
             itemTouch = true
+            pressedIcon.value = key
             lastTap = coords.c?.takeIf { it.isAttached }?.localToWindow(down.position)
             try {
             var moved = false
@@ -271,8 +278,8 @@ private fun Modifier.liftable(key: Any, coords: Coords, drag: DragController, pa
                 }
                 result
             }
-            if (released == true) { onTap(); return@awaitEachGesture }
-            if (moved) return@awaitEachGesture
+            if (released == true) { pressedIcon.value = null; onTap(); return@awaitEachGesture }
+            if (moved) { pressedIcon.value = null; return@awaitEachGesture }
             haptic()
             val root = { p: Offset -> coords.c?.takeIf { it.isAttached }?.localToRoot(p) ?: p }
             drag.payload = payload(); drag.pos = root(down.position)
@@ -286,9 +293,10 @@ private fun Modifier.liftable(key: Any, coords: Coords, drag: DragController, pa
                 ch.consume()
             }
             if (!dragging) { drag.reset(); onMenu() } else dropRequested.intValue++
-            } finally { itemTouch = false }
+            } finally { itemTouch = false; pressedIcon.value = null }
         }
     }
+}
 
 /** Takes [key] out of a home folder; a folder left with one app becomes that app. */
 private fun removeFromFolder(c: Context, folderId: String, key: String) {
@@ -490,7 +498,13 @@ fun Desktop(activity: MainActivity) {
                 })
                 HorizontalPager(pager, Modifier.fillMaxSize(), userScrollEnabled = !drag.active && movingWidget == null, beyondBoundsPageCount = 1) { v ->
                     val page = real(v)
-                    Box(Modifier.fillMaxSize()) {
+                    // Pages ease back and fade slightly as you swipe, like turning a card, instead of sliding flat.
+                    Box(Modifier.fillMaxSize().graphicsLayer {
+                        val off = ((pager.currentPage - v) + pager.currentPageOffsetFraction).coerceIn(-1f, 1f)
+                        val a = kotlin.math.abs(off)
+                        scaleX = 1f - .07f * a; scaleY = 1f - .07f * a; alpha = 1f - .4f * a
+                        rotationY = off * 10f; cameraDistance = 14f * this.density
+                    }) {
                         if (drag.dragging || movingWidget != null) GridGuide(page, drag, movingWidget, cellW, cellH)
                         Home.items.filter { it.page == page }.forEach { item ->
                             key(item.id) {

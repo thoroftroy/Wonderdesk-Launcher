@@ -1,5 +1,10 @@
 # Launcher changelog
 
+## v0.5.7
+
+- Icons on the home screen and in the Dock sink in under your finger and spring back, like real buttons
+- Swiping between pages turns them like cards: the page tilts, eases back and fades instead of sliding flat
+
 ## v0.5.6
 
 - Desktop sounds: a soft pop when an app opens, whooshes when folders and Beacon open and close, and a puff when you remove something. Silent whenever your ringer is off; switch them off in Home screen settings › Interface sounds
