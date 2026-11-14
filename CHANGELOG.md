@@ -1,5 +1,10 @@
 # Launcher changelog
 
+## v0.5.11
+
+- While you drag an app or widget, the other icons wiggle gently, like rearranging icons on an iPhone (only during a drag, so no battery cost)
+- Fixed a crash when moving around with arrow keys or Tab while a screen was closing
+
 ## v0.5.10
 
 - Dock icons bounce when you open an app, like the Mac Dock

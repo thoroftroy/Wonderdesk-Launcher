@@ -276,7 +276,16 @@ private val pressedIcon = mutableStateOf<Any?>(null)
 private fun Modifier.liftable(key: Any, coords: Coords, drag: DragController, payload: () -> Payload, onTap: () -> Unit, onMenu: () -> Unit, onDragStart: () -> Unit = {}, haptic: () -> Unit) = composed {
     val sc by androidx.compose.animation.core.animateFloatAsState(if (pressedIcon.value == key) .86f else 1f,
         androidx.compose.animation.core.spring(dampingRatio = .55f, stiffness = 700f), label = "press")
-    graphicsLayer { scaleX = sc; scaleY = sc }.pointerInput(key) {
+    // While something is being dragged, the other icons wiggle gently, like rearranging on an iPhone. Only runs during a drag.
+    val wiggle = remember { androidx.compose.animation.core.Animatable(0f) }
+    val dragging = drag.dragging && drag.payload?.let { (it as? Payload.HomeItem)?.item?.id != key && (it as? Payload.DockApp)?.key != key } != false
+    LaunchedEffect(dragging) {
+        if (!dragging) { wiggle.animateTo(0f, androidx.compose.animation.core.tween(120)); return@LaunchedEffect }
+        val phase = (key.hashCode() and 3) * 40L
+        kotlinx.coroutines.delay(phase)
+        while (true) { wiggle.animateTo(1f, androidx.compose.animation.core.tween(130)); wiggle.animateTo(-1f, androidx.compose.animation.core.tween(130)) }
+    }
+    graphicsLayer { scaleX = sc; scaleY = sc; rotationZ = wiggle.value * 2.2f }.pointerInput(key) {
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false)
             itemTouch = true
