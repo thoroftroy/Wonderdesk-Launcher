@@ -1,5 +1,11 @@
 # Launcher changelog
 
+## v0.5.5
+
+- Wallpaper editor: pinch and drag to frame any picture with your icons, Dock and menu bar shown on top, dim it, then set it for the home screen, lock screen or both
+- Day and night wallpapers: keep one for daytime and one for night, and they swap by themselves at the hours you pick
+- The Home button always takes you back to the desktop, even from Settings, the wallpaper editor or the widget list
+
 ## v0.5.4
 
 - Icon packs: Home screen settings › Icon pack works with any pack made for Nova, Lawnchair and other launchers. Apps a pack doesn't cover keep their own icon

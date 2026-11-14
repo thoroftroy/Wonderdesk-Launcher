@@ -4,6 +4,7 @@
     <!-- Needed for the Uninstall action (Android asks the user to confirm every time). -->
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
     <queries><package android:name="dev.wonderdesk.beacon" /><intent><action android:name="org.adw.launcher.THEMES" /></intent><intent><action android:name="com.novalauncher.THEME" /></intent><intent><action android:name="com.teslacoilsw.launcher.THEME" /></intent><intent><action android:name="com.gau.go.launcherex.theme" /></intent><intent><action android:name="org.adw.ActivityStarter.THEMES" /></intent></queries>
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <application android:enableOnBackInvokedCallback="true" android:label="Wonderdesk" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" tools:replace="android:icon,android:roundIcon">
         <activity android:name=".MainActivity" android:theme="@style/WonderdeskLauncherTheme" android:exported="true" android:launchMode="singleTask" android:stateNotNeeded="true"
             android:resizeableActivity="true" android:clearTaskOnLaunch="true" android:excludeFromRecents="true" android:windowSoftInputMode="adjustPan"
@@ -19,5 +20,6 @@
         <activity android:name=".PinActivity" android:exported="true" android:theme="@android:style/Theme.Translucent.NoTitleBar" android:excludeFromRecents="true" android:taskAffinity="" android:autoRemoveFromRecents="true">
             <intent-filter><action android:name="android.content.pm.action.CONFIRM_PIN_APPWIDGET" /></intent-filter>
         </activity>
+        <receiver android:name=".DayNightReceiver" android:exported="false"><intent-filter><action android:name="android.intent.action.BOOT_COMPLETED" /><action android:name="android.intent.action.TIME_SET" /><action android:name="android.intent.action.TIMEZONE_CHANGED" /></intent-filter></receiver>
     </application>
 </manifest>

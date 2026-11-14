@@ -341,10 +341,11 @@ fun Desktop(activity: MainActivity) {
             val target = s.defaultPage.coerceIn(0, pages - 1)
             pager.animateScrollToPage(pager.currentPage + (target - currentPage))
         }
-        launchpad = false; folder = null; settingsOpen = false; widgetPicker = false; wallpaper = false
+        launchpad = false; folder = null; settingsOpen = false; widgetPicker = false; wallpaper = false; homeMenu = false; movingWidget = null
     }
     val back by MainActivity.returned
-    LaunchedEffect(back) { if (back > 0) { launchpad = false; folder = null } }
+    // Home from anywhere (another app, the system picture picker, Android settings) closes every panel and returns to the desktop.
+    LaunchedEffect(back) { if (back > 0) { launchpad = false; folder = null; settingsOpen = false; widgetPicker = false; wallpaper = false; homeMenu = false; movingWidget = null } }
 
     BackHandler(launchpad || folder != null || settingsOpen || widgetPicker || wallpaper || movingWidget != null) {
         when { movingWidget != null -> movingWidget = null; wallpaper -> wallpaper = false; widgetPicker -> widgetPicker = false; settingsOpen -> settingsOpen = false; folder != null -> folder = null; else -> launchpad = false }
@@ -1249,8 +1250,23 @@ private fun WallpaperPicker(onClose: () -> Unit) {
     val thumbs = remember { mutableStateMapOf<String, ImageBitmap>() }
     LaunchedEffect(Unit) { Wallpapers.STYLES.forEach { st -> thumbs[st.id] = withContext(Dispatchers.Default) { Wallpapers.thumbnail(st.id).asImageBitmap() } } }
     // Android's photo picker works with any gallery, including Memories, and needs no permission.
-    val photo = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> if (uri != null) target = null to uri }
     val toast = remember { mutableStateOf<(String) -> Unit>({}) }
+    var editing by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+    val dm = context.resources.displayMetrics
+    val photo = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> if (uri != null) scope.launch {
+        busy = true
+        editing = withContext(Dispatchers.IO) { runCatching {
+            val o = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            context.contentResolver.openInputStream(uri)!!.use { android.graphics.BitmapFactory.decodeStream(it, null, o) }
+            var sample = 1; while (maxOf(o.outWidth, o.outHeight) / (sample * 2) >= maxOf(dm.widthPixels, dm.heightPixels) * 2) sample *= 2
+            val b = context.contentResolver.openInputStream(uri)!!.use { android.graphics.BitmapFactory.decodeStream(it, null, android.graphics.BitmapFactory.Options().apply { inSampleSize = sample }) }!!
+            val deg = runCatching { context.contentResolver.openInputStream(uri)!!.use { when (android.media.ExifInterface(it).getAttributeInt(android.media.ExifInterface.TAG_ORIENTATION, 1)) { 6 -> 90; 3 -> 180; 8 -> 270; else -> 0 } } }.getOrDefault(0)
+            if (deg == 0) b else android.graphics.Bitmap.createBitmap(b, 0, 0, b.width, b.height, android.graphics.Matrix().apply { postRotate(deg.toFloat()) }, true)
+        }.getOrNull() }
+        busy = false
+        if (editing == null) toast.value("Couldn't open that picture")
+    } }
+    editing?.let { b -> WallpaperEditor(b, onClose = { editing = null }, onDone = { m -> editing = null; toast.value(m) }); return }
     WonderApp(appName = "Wonderdesk", about = "Wallpaper", title = "Desktop & wallpaper", onBack = onClose) {
         toast.value = LocalToast.current
         Page {
@@ -1259,7 +1275,7 @@ private fun WallpaperPicker(onClose: () -> Unit) {
                     Wallpapers.STYLES.chunked(3).forEach { row ->
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             row.forEach { st ->
-                                Column(Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).clickable { target = st.id to null }.padding(2.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                Column(Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).clickable { scope.launch { editing = withContext(Dispatchers.Default) { Wallpapers.render(st.id, dm.widthPixels, dm.heightPixels) } } }.padding(2.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                                     Box(Modifier.fillMaxWidth().aspectRatio(9f / 16f).clip(RoundedCornerShape(10.dp)).background(p.window).border(1.dp, p.panelBorder, RoundedCornerShape(10.dp))) {
                                         thumbs[st.id]?.let { Image(it, st.name, Modifier.fillMaxSize(), contentScale = androidx.compose.ui.layout.ContentScale.Crop) }
                                     }
@@ -1277,6 +1293,18 @@ private fun WallpaperPicker(onClose: () -> Unit) {
                 PanelDivider()
                 ListRow("Other wallpaper apps", subtitle = "Live wallpapers and your phone's own styles", icon = WonderIcons.Wallpaper, tint = Color(0xFF8E44AD), chevron = true,
                     onClick = { context.launchSafely(Intent.createChooser(Intent(Intent.ACTION_SET_WALLPAPER), "Wallpaper")) {} })
+            }
+            var dayNight by remember { mutableStateOf(DayNight.enabled(context)) }
+            var dayH by remember { mutableIntStateOf(DayNight.dayHour(context)) }
+            var nightH by remember { mutableIntStateOf(DayNight.nightHour(context)) }
+            Panel(title = "Day and night", footer = if (dayNight) "Pick any wallpaper and choose Daytime or Night wallpaper when setting it." else "Pick a wallpaper above and choose “Daytime wallpaper” or “Night wallpaper” when setting it. They swap by themselves at the times below.") {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Day starts at $dayH:00", style = MaterialTheme.typography.labelLarge)
+                    Slider(dayH.toFloat(), { dayH = it.toInt() }, valueRange = 4f..11f, steps = 6, onValueChangeFinished = { DayNight.setHours(context, dayH, nightH) })
+                    Text("Night starts at $nightH:00", style = MaterialTheme.typography.labelLarge)
+                    Slider(nightH.toFloat(), { nightH = it.toInt() }, valueRange = 16f..23f, steps = 6, onValueChangeFinished = { DayNight.setHours(context, dayH, nightH) })
+                }
+                if (dayNight) { PanelDivider(0.dp); ListRow("Stop switching", subtitle = "Keeps whatever wallpaper is up now", icon = WonderIcons.Close, danger = true, onClick = { DayNight.clear(context); dayNight = false }) }
             }
             if (busy) AquaProgress(null, Modifier.fillMaxWidth())
         }
