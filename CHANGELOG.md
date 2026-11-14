@@ -1,5 +1,9 @@
 # Launcher changelog
 
+## v0.5.8
+
+- Changing the look in Control Room now restyles this app's widgets straight away, with no refresh or restart
+
 ## v0.5.7
 
 - Icons on the home screen and in the Dock sink in under your finger and spring back, like real buttons
