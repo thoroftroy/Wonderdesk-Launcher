@@ -69,19 +69,21 @@ data class Settings(
     val rotate: Boolean = false,
     /** Package of an installed icon pack, or "" for the apps' own icons. */
     val iconPack: String = "",
+    /** Soft interface sounds (see Sounds). */
+    val sounds: Boolean = true,
 ) {
     /** What the icon renderer gets: the style plus the icon pack, if any. */
     val iconKey get() = if (iconPack.isBlank()) iconStyle else "$iconStyle|pack:$iconPack"
     fun toJson(): JSONObject = JSONObject().put("cols", cols).put("rows", rows).put("iconScale", iconScale.toDouble()).put("labels", labels).put("magnify", dockMagnify)
         .put("dockLabels", dockLabels).put("menuBar", menuBar).put("pages", pages).put("swipeUp", swipeUp).put("swipeDown", swipeDown).put("doubleTap", doubleTap)
         .put("lpSort", launchpadSort).put("darkLabels", darkLabels).put("iconStyle", iconStyle).put("reflections", reflections).put("askDefault", askDefault)
-        .put("infinite", infinite).put("defaultPage", defaultPage).put("lpFoldersFirst", lpFoldersFirst).put("beaconLaunchpad", beaconLaunchpad).put("rotate", rotate).put("iconPack", iconPack)
+        .put("infinite", infinite).put("defaultPage", defaultPage).put("lpFoldersFirst", lpFoldersFirst).put("beaconLaunchpad", beaconLaunchpad).put("rotate", rotate).put("iconPack", iconPack).put("sounds", sounds)
 
     companion object {
         fun from(o: JSONObject) = Settings(o.optInt("cols", 4), o.optInt("rows", 5), o.optDouble("iconScale", 1.0).toFloat(), o.optBoolean("labels", true), o.optBoolean("magnify", true),
             o.optBoolean("dockLabels"), o.optBoolean("menuBar", true), o.optInt("pages", 2), o.optString("swipeUp", "launchpad"), o.optString("swipeDown", "notifications"),
             o.optString("doubleTap", "none"), o.optString("lpSort", "name"), o.optBoolean("darkLabels"), o.optString("iconStyle", "natural"), o.optBoolean("reflections", true),
-            o.optBoolean("askDefault", true), o.optBoolean("infinite"), o.optInt("defaultPage", 0), o.optBoolean("lpFoldersFirst", true), o.optBoolean("beaconLaunchpad", true), o.optBoolean("rotate", false), o.optString("iconPack", ""))
+            o.optBoolean("askDefault", true), o.optBoolean("infinite"), o.optInt("defaultPage", 0), o.optBoolean("lpFoldersFirst", true), o.optBoolean("beaconLaunchpad", true), o.optBoolean("rotate", false), o.optString("iconPack", ""), o.optBoolean("sounds", true))
     }
 }
 

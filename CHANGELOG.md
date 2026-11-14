@@ -1,5 +1,9 @@
 # Launcher changelog
 
+## v0.5.6
+
+- Desktop sounds: a soft pop when an app opens, whooshes when folders and Beacon open and close, and a puff when you remove something. Silent whenever your ringer is off; switch them off in Home screen settings › Interface sounds
+
 ## v0.5.5
 
 - Wallpaper editor: pinch and drag to frame any picture with your icons, Dock and menu bar shown on top, dim it, then set it for the home screen, lock screen or both

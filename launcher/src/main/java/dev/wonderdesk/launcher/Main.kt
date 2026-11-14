@@ -129,6 +129,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge(SystemBarStyle.dark(android.graphics.Color.TRANSPARENT), SystemBarStyle.dark(android.graphics.Color.TRANSPARENT))
         super.onCreate(savedInstanceState)
         host = WdWidgetHost(this, HOST_ID)
+        Sounds.enabled = Home.settings.sounds; Sounds.init(applicationContext)
         Home.load(this)
         getSystemService(LauncherApps::class.java).registerCallback(callback)
         applyRotation()
@@ -180,6 +181,7 @@ fun Context.isDefaultHome(): Boolean = packageManager.resolveActivity(Intent(Int
 var lastTap: Offset? = null
 
 fun Context.launch(a: App) = runCatching {
+    Sounds.play(this, Sounds.S.Open)
     // Apps open by growing out of the icon you tapped, like a stock launcher.
     val opts = (this as? android.app.Activity)?.window?.decorView?.let { v -> lastTap?.let { p ->
         val s = (64 * resources.displayMetrics.density).toInt()
@@ -321,6 +323,8 @@ fun Desktop(activity: MainActivity) {
     var launchpadSearch by remember { mutableStateOf(false) }
     var folder by remember { mutableStateOf<Pair<String, Rect>?>(null) }
     var settingsOpen by remember { mutableStateOf(false) }
+    var hadFolder by remember { mutableStateOf(false) }
+    LaunchedEffect(folder != null) { if (folder != null) hadFolder = true else if (hadFolder) { hadFolder = false; Sounds.play(context, Sounds.S.FolderClose) } }
     var widgetPicker by remember { mutableStateOf(false) }
     var wallpaper by remember { mutableStateOf(false) }
     var homeMenu by remember { mutableStateOf(false) }
@@ -352,6 +356,7 @@ fun Desktop(activity: MainActivity) {
     }
     /** All your apps live in Beacon. (Only if Beacon isn't installed is there a simple built-in list, so apps can still be found.) */
     fun openLaunchpad(search: Boolean) {
+        Sounds.play(context, Sounds.S.FolderOpen)
         val beacon = Intent("dev.wonderdesk.beacon.LAUNCHPAD").setPackage("dev.wonderdesk.beacon").putExtra("search", search).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         if (context.packageManager.resolveActivity(beacon, 0) != null) {
             val opts = android.app.ActivityOptions.makeCustomAnimation(context, android.R.anim.fade_in, 0).toBundle()
@@ -417,7 +422,7 @@ fun Desktop(activity: MainActivity) {
         } }
         when (h) {
             Hover.Remove -> when (pl) {
-                is Payload.HomeItem -> { (pl.item as? Item.Widget)?.let { activity.host.deleteAppWidgetId(it.widgetId) }; Home.remove(context, pl.item.id); toast.value("Removed from home screen") }
+                is Payload.HomeItem -> { Sounds.play(context, Sounds.S.Poof); (pl.item as? Item.Widget)?.let { activity.host.deleteAppWidgetId(it.widgetId) }; Home.remove(context, pl.item.id); toast.value("Removed from home screen") }
                 is Payload.GridApp -> toast.value("To hide an app, hold it in Beacon and choose Hide")
                 else -> removeSource()
             }
@@ -495,7 +500,7 @@ fun Desktop(activity: MainActivity) {
                                     .graphicsLayer { alpha = if (lifted || movingWidget?.id == item.id) .25f else 1f }
                                     .onGloballyPositioned { coords.c = it }
                                     .then(if (item !is Item.Widget) Modifier.liftable(item, coords, drag, { Payload.HomeItem(item) },
-                                        onTap = { when (item) { is Item.Shortcut -> Home.app(item.app)?.let { context.launch(it) }; is Item.Folder -> folder = item.id to (coords.c?.boundsInRoot() ?: Rect.Zero); else -> {} } },
+                                        onTap = { when (item) { is Item.Shortcut -> Home.app(item.app)?.let { context.launch(it) }; is Item.Folder -> { Sounds.play(context, Sounds.S.FolderOpen); folder = item.id to (coords.c?.boundsInRoot() ?: Rect.Zero) }; else -> {} } },
                                         onMenu = { itemMenu = item }, haptic = hapticLong) else Modifier), contentAlignment = Alignment.Center) {
                                     when (item) {
                                         is Item.Shortcut -> Home.app(item.app)?.let { AppIcon(it) }
@@ -1394,6 +1399,9 @@ private fun LauncherSettings(onClose: () -> Unit, onWallpaper: () -> Unit) {
             Panel(title = "Icons", footer = "Natural keeps each icon's own shape and see-through edges. Aqua tiles puts every icon on a rounded glossy tile.") {
                 Column(Modifier.padding(12.dp)) { Segmented(listOf("Natural", "Aqua tiles"), if (s.iconStyle == "tiles") 1 else 0) { set(s.copy(iconStyle = if (it == 1) "tiles" else "natural")); Home.reloadIcons(context) } }
                 PanelDivider(0.dp)
+                PanelDivider()
+                SwitchRow("Interface sounds", s.sounds, { set(s.copy(sounds = it)); Sounds.enabled = it; if (it) Sounds.play(context, Sounds.S.Chime) },
+                    subtitle = "Soft desktop sounds when apps and folders open and things are removed. Silent when your ringer is off", icon = WonderIcons.VolumeUp, tint = Color(0xFFE5483C))
                 PanelDivider()
                 var packs by remember { mutableStateOf<List<Pair<String, String>>?>(null) }
                 LaunchedEffect(Unit) { packs = withContext(Dispatchers.IO) { IconPack.installed(context) } }
