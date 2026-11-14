@@ -1263,7 +1263,19 @@ private fun WidgetPicker(activity: MainActivity, page: Int, onDismiss: () -> Uni
                                 else bind.launch(Intent(AppWidgetManager.ACTION_APPWIDGET_BIND).putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id).putExtra(AppWidgetManager.EXTRA_APPWIDGET_PROVIDER, pr.provider))
                             }.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Box(Modifier.size(width = 120.dp, height = 84.dp).clip(RoundedCornerShape(10.dp)).background(Brush.verticalGradient(listOf(Color(0xFF3B6EA8), Color(0xFF1C3F6B)))), contentAlignment = Alignment.Center) {
-                                    preview?.let { Image(it, null, Modifier.fillMaxSize().padding(6.dp), contentScale = androidx.compose.ui.layout.ContentScale.Fit) }
+                                    // Android 12+: show the widget itself (its live preview layout), shrunk to fit; otherwise its preview picture.
+                                    val live = android.os.Build.VERSION.SDK_INT >= 31 && pr.previewLayout != 0 && pr.loadPreviewImage(context, 0) == null
+                                    if (live) androidx.compose.ui.viewinterop.AndroidView({ ctx ->
+                                        android.widget.FrameLayout(ctx).apply {
+                                            runCatching {
+                                                val v = android.widget.RemoteViews(pr.provider.packageName, pr.previewLayout).apply(ctx, this)
+                                                val wPx = (pr.minWidth.coerceAtLeast(110)); val hPx = (pr.minHeight.coerceAtLeast(60))
+                                                addView(v, android.widget.FrameLayout.LayoutParams(wPx, hPx, android.view.Gravity.CENTER))
+                                                post { val sc = minOf(width / wPx.toFloat(), height / hPx.toFloat(), 1f) * .92f; v.scaleX = sc; v.scaleY = sc }
+                                            }
+                                        }
+                                    }, Modifier.fillMaxSize())
+                                    else preview?.let { Image(it, null, Modifier.fillMaxSize().padding(6.dp), contentScale = androidx.compose.ui.layout.ContentScale.Fit) }
                                 }
                                 Spacer(Modifier.width(12.dp))
                                 Column(Modifier.weight(1f)) {

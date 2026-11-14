@@ -1,5 +1,9 @@
 # Launcher changelog
 
+## v0.5.12
+
+- Add a widget shows the real widgets, drawn live (Android 12 and newer), instead of app icons, so you can see what you're adding
+
 ## v0.5.11
 
 - While you drag an app or widget, the other icons wiggle gently, like rearranging icons on an iPhone (only during a drag, so no battery cost)
