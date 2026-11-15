@@ -140,6 +140,12 @@ class MainActivity : ComponentActivity() {
         val tablet = resources.configuration.smallestScreenWidthDp >= 600
         requestedOrientation = if (Home.settings.rotate || tablet) android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED else android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
     }
+    fun applyFullscreen() {
+        val c = androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
+        if (Home.settings.fullscreen) { c.systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE; c.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars()) }
+        else c.show(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+    }
+    override fun onWindowFocusChanged(hasFocus: Boolean) { super.onWindowFocusChanged(hasFocus); if (hasFocus) applyFullscreen() }
     override fun onStart() { super.onStart(); runCatching { host.startListening() } }
     override fun onStop() { super.onStop(); runCatching { host.stopListening() } }
     override fun onDestroy() { getSystemService(LauncherApps::class.java).unregisterCallback(callback); super.onDestroy() }
@@ -687,6 +693,7 @@ private fun MenuBar(onApps: () -> Unit, onSearch: () -> Unit, onSettings: () -> 
     val nowMs = rememberNow(60_000)
     val now = remember(nowMs) { LocalDateTime.now() }
     var orb by remember { mutableStateOf(false) }
+    val st = Home.settings
     val is24 = android.text.format.DateFormat.is24HourFormat(context)
     val pal = wonderPalette()
     val ink = pal.toolbarText
@@ -709,14 +716,13 @@ private fun MenuBar(onApps: () -> Unit, onSearch: () -> Unit, onSettings: () -> 
                     DropdownMenuItem({ Text("Home screen settings") }, { orb = false; onSettings() }, leadingIcon = { Icon(WonderIcons.Settings, null) })
                 }
             }
-            Text("Apps", Modifier.clip(RoundedCornerShape(4.dp)).clickable(onClick = onApps).padding(8.dp, 4.dp), style = TextStyle(fontSize = 14.sp, color = ink))
             Spacer(Modifier.weight(1f))
-            Icon(WonderIcons.Search, "Search", Modifier.clip(CircleShape).clickable(onClick = onSearch).padding(6.dp).size(20.dp), tint = pal.toolbarIcon)
+            if (st.barSearch) Icon(WonderIcons.Search, "Search", Modifier.clip(CircleShape).clickable(onClick = onSearch).padding(6.dp).size(20.dp), tint = pal.toolbarIcon)
             // Date opens Chronicle, time opens Timepiece.
-            Text(now.format(DateTimeFormatter.ofPattern("EEE d MMM")), Modifier.clip(RoundedCornerShape(4.dp)).clickable {
+            if (st.barDate) Text(now.format(DateTimeFormatter.ofPattern("EEE d MMM")), Modifier.clip(RoundedCornerShape(4.dp)).clickable {
                 context.openPackageOr("dev.wonderdesk.chronicle", Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_CALENDAR))
             }.padding(6.dp, 4.dp), style = TextStyle(fontSize = 14.sp, color = ink, fontWeight = FontWeight.Medium), maxLines = 1)
-            Text(now.format(DateTimeFormatter.ofPattern(if (is24) "HH:mm" else "h:mm a")), Modifier.clip(RoundedCornerShape(4.dp)).clickable {
+            if (st.barTime) Text(now.format(DateTimeFormatter.ofPattern(if (is24) "HH:mm" else "h:mm a")), Modifier.clip(RoundedCornerShape(4.dp)).clickable {
                 context.openPackageOr("dev.wonderdesk.timepiece", Intent(android.provider.AlarmClock.ACTION_SHOW_ALARMS))
             }.padding(6.dp, 4.dp), style = TextStyle(fontSize = 14.sp, color = ink, fontWeight = FontWeight.SemiBold), maxLines = 1)
         }
@@ -1405,7 +1411,13 @@ private fun Welcome(activity: MainActivity, onMore: () -> Unit, onWallpaper: () 
             }
             Panel {
                 SwitchRow("Magnifying Dock", s.dockMagnify, { set(s.copy(dockMagnify = it)) }); PanelDivider()
-                SwitchRow("Menu bar with clock", s.menuBar, { set(s.copy(menuBar = it)) }); PanelDivider()
+                SwitchRow("Menu bar", s.menuBar, { set(s.copy(menuBar = it)) }); PanelDivider()
+                if (s.menuBar) {
+                    SwitchRow("Search in the menu bar", s.barSearch, { set(s.copy(barSearch = it)) }); PanelDivider()
+                    SwitchRow("Date in the menu bar", s.barDate, { set(s.copy(barDate = it)) }); PanelDivider()
+                    SwitchRow("Clock in the menu bar", s.barTime, { set(s.copy(barTime = it)) }); PanelDivider()
+                }
+                SwitchRow("Full screen", s.fullscreen, { set(s.copy(fullscreen = it)); (context as? MainActivity)?.applyFullscreen() }, subtitle = "Hides the status and navigation bars on the home screen; swipe from the edge to peek at them"); PanelDivider()
                 SwitchRow("Allow home screen rotation", s.rotate, { set(s.copy(rotate = it)); (context as? MainActivity)?.applyRotation() }, subtitle = "Off keeps the home screen upright when you turn the phone; apps still rotate"); PanelDivider()
                 SwitchRow("Endless page scrolling", s.infinite, { set(s.copy(infinite = it)) }); PanelDivider()
                 ListRow("Choose a wallpaper", subtitle = "Wonderdesk's Aqua wallpapers or a photo", icon = WonderIcons.Wallpaper, tint = Color(0xFF8E44AD), chevron = true, onClick = onWallpaper)

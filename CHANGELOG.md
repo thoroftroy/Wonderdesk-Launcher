@@ -1,5 +1,11 @@
 # Launcher changelog
 
+## v0.5.13
+
+- The menu bar no longer has a second Apps button (the Wonderdesk menu and swiping up already open all apps)
+- Choose what the menu bar shows: search, date and clock each have a switch in the home screen settings
+- Full screen: the home screen hides the status and navigation bars (on by default; swipe from the edge to peek, or switch it off in settings)
+
 ## v0.5.12
 
 - Add a widget shows the real widgets, drawn live (Android 12 and newer), instead of app icons, so you can see what you're adding
