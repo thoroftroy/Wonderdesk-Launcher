@@ -142,7 +142,7 @@ class MainActivity : ComponentActivity() {
     }
     fun applyFullscreen() {
         val c = androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
-        if (Home.settings.fullscreen) { c.systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE; c.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars()) }
+        if (Home.settings.fullscreen) { c.systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE; c.hide(androidx.core.view.WindowInsetsCompat.Type.statusBars()); c.show(androidx.core.view.WindowInsetsCompat.Type.navigationBars()) }
         else c.show(androidx.core.view.WindowInsetsCompat.Type.systemBars())
     }
     override fun onWindowFocusChanged(hasFocus: Boolean) { super.onWindowFocusChanged(hasFocus); if (hasFocus) applyFullscreen() }
@@ -1417,7 +1417,7 @@ private fun Welcome(activity: MainActivity, onMore: () -> Unit, onWallpaper: () 
                     SwitchRow("Date in the menu bar", s.barDate, { set(s.copy(barDate = it)) }); PanelDivider()
                     SwitchRow("Clock in the menu bar", s.barTime, { set(s.copy(barTime = it)) }); PanelDivider()
                 }
-                SwitchRow("Full screen", s.fullscreen, { set(s.copy(fullscreen = it)); (context as? MainActivity)?.applyFullscreen() }, subtitle = "Hides the status and navigation bars on the home screen; swipe from the edge to peek at them"); PanelDivider()
+                SwitchRow("Full screen", s.fullscreen, { set(s.copy(fullscreen = it)); (context as? MainActivity)?.applyFullscreen() }, subtitle = "Hides the status bar on the home screen (the Back, Home and Recents buttons stay); swipe from the top to peek"); PanelDivider()
                 SwitchRow("Allow home screen rotation", s.rotate, { set(s.copy(rotate = it)); (context as? MainActivity)?.applyRotation() }, subtitle = "Off keeps the home screen upright when you turn the phone; apps still rotate"); PanelDivider()
                 SwitchRow("Endless page scrolling", s.infinite, { set(s.copy(infinite = it)) }); PanelDivider()
                 ListRow("Choose a wallpaper", subtitle = "Wonderdesk's Aqua wallpapers or a photo", icon = WonderIcons.Wallpaper, tint = Color(0xFF8E44AD), chevron = true, onClick = onWallpaper)

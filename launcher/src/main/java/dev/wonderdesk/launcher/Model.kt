@@ -72,7 +72,7 @@ data class Settings(
     /** Soft interface sounds (see Sounds). */
     val sounds: Boolean = true,
     /** Menu bar pieces and hiding the system bars on the home screen. */
-    val barSearch: Boolean = true, val barDate: Boolean = true, val barTime: Boolean = true, val fullscreen: Boolean = true,
+    val barSearch: Boolean = true, val barDate: Boolean = true, val barTime: Boolean = true, val fullscreen: Boolean = false,
 ) {
     /** What the icon renderer gets: the style plus the icon pack, if any. */
     val iconKey get() = if (iconPack.isBlank()) iconStyle else "$iconStyle|pack:$iconPack"
@@ -87,7 +87,7 @@ data class Settings(
             o.optBoolean("dockLabels"), o.optBoolean("menuBar", true), o.optInt("pages", 2), o.optString("swipeUp", "launchpad"), o.optString("swipeDown", "notifications"),
             o.optString("doubleTap", "none"), o.optString("lpSort", "name"), o.optBoolean("darkLabels"), o.optString("iconStyle", "natural"), o.optBoolean("reflections", true),
             o.optBoolean("askDefault", true), o.optBoolean("infinite"), o.optInt("defaultPage", 0), o.optBoolean("lpFoldersFirst", true), o.optBoolean("beaconLaunchpad", true), o.optBoolean("rotate", false), o.optString("iconPack", ""), o.optBoolean("sounds", true),
-            o.optBoolean("barSearch", true), o.optBoolean("barDate", true), o.optBoolean("barTime", true), o.optBoolean("fullscreen", true))
+            o.optBoolean("barSearch", true), o.optBoolean("barDate", true), o.optBoolean("barTime", true), o.optBoolean("fullscreen", false))
     }
 }
 

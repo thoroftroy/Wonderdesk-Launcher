@@ -1,5 +1,9 @@
 # Launcher changelog
 
+## v0.5.14
+
+- The Back, Home and Recents buttons are no longer hidden: Full screen now only hides the status bar, and is off by default
+
 ## v0.5.13
 
 - The menu bar no longer has a second Apps button (the Wonderdesk menu and swiping up already open all apps)
