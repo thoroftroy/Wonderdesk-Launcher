@@ -1,5 +1,10 @@
 # Launcher changelog
 
+## v0.5.16
+
+- The menu bar no longer touches the very top edge of the screen — there's a real wallpaper gap above it, including in full-screen mode
+- Folder changes coming in from Beacon are written to disk before answering, so they can't appear to revert on the next read
+
 ## v0.5.15
 
 - Desktop grid has breathing room at the top, below the menu bar or status area

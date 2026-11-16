@@ -64,7 +64,7 @@ class AppsProvider : ContentProvider() {
             "renameGroup" -> { val g = extras?.getString("group") ?: return null; arg?.let { Home.renameGroup(c, g, it) } }
             "deleteGroup" -> arg?.let { Home.deleteGroup(c, it) }
             "recordLaunch" -> arg?.let { Home.recordLaunch(c, it) }
-            "addToHome" -> return Bundle().apply { putBoolean("ok", arg != null && Home.addShortcut(c, arg, Home.currentPage)) }
+            "addToHome" -> { val ok = arg != null && Home.addShortcut(c, arg, Home.currentPage); Home.saveSync(c); return Bundle().apply { putBoolean("ok", ok) } }
             "addToDock" -> { val a = arg ?: return null; if (a in Home.dock) return Bundle().apply { putBoolean("ok", true) }
                 if (Home.dock.size >= 8) return Bundle().apply { putBoolean("ok", false) }; Home.dock = Home.dock + a; Home.save(c) }
             "hide" -> arg?.let { Home.hidden = Home.hidden + it; Home.save(c) }
@@ -72,6 +72,9 @@ class AppsProvider : ContentProvider() {
             "setSort" -> arg?.let { Home.settings = Home.settings.copy(launchpadSort = it); Home.save(c) }
             else -> return null
         }
+        // Another app may read back in a brand-new process: with async writes that process loads
+        // pre-write disk and hands back stale folders. recordLaunch (every app open) stays async.
+        if (method != "recordLaunch") Home.saveSync(c)
         return Bundle()
     }
 

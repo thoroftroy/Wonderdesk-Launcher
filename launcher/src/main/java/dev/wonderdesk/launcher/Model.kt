@@ -243,14 +243,26 @@ object Home {
     fun newId() = UUID.randomUUID().toString()
 
     fun save(c: Context) {
-        prefs(c).edit()
+        editAll(c).apply()
+    }
+
+    /**
+     * Same as [save] but written to disk before it returns. The folder provider serves other apps,
+     * which may read back in a brand-new process: with [save]'s async write that process could load
+     * yesterday's disk and hand back stale folders. Group changes from outside always use this.
+     */
+    fun saveSync(c: Context) {
+        editAll(c).commit()
+    }
+
+    private fun editAll(c: Context): android.content.SharedPreferences.Editor {
+        return prefs(c).edit()
             .putString("items", JSONArray(items.map { it.toJson() }).toString())
             .putString("dock", JSONArray(dock).toString())
             .putStringSet("hidden", hidden)
             .putString("names", JSONObject(names).toString())
             .putString("groups", JSONArray(groups.map { g -> JSONObject().put("id", g.id).put("name", g.name).put("apps", JSONArray(g.apps)) }).toString())
             .putString("settings", settings.toJson().toString())
-            .apply()
     }
 
     fun savePage(c: Context, page: Int) { currentPage = page; prefs(c).edit().putInt("page", page).apply() }

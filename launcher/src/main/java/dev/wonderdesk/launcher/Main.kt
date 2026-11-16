@@ -697,7 +697,7 @@ private fun MenuBar(onApps: () -> Unit, onSearch: () -> Unit, onSettings: () -> 
     val is24 = android.text.format.DateFormat.is24HourFormat(context)
     val pal = wonderPalette()
     val ink = pal.toolbarText
-    Column(Modifier.fillMaxWidth().background(Brush.verticalGradient(pal.toolbar.take(2).map { it.copy(alpha = .93f) })).statusBarsPadding()) {
+    Column(Modifier.fillMaxWidth().padding(top = 8.dp).background(Brush.verticalGradient(pal.toolbar.take(2).map { it.copy(alpha = .93f) })).statusBarsPadding()) {
         Row(Modifier.fillMaxWidth().height(32.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Box {
                 val art = remember { context.appArt(64) }
