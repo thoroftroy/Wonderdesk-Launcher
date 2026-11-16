@@ -1,5 +1,9 @@
 # Launcher changelog
 
+## v0.5.15
+
+- Desktop grid has breathing room at the top, below the menu bar or status area
+
 ## v0.5.14
 
 - The Back, Home and Recents buttons are no longer hidden: Full screen now only hides the status bar, and is off by default

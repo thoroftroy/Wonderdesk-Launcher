@@ -516,7 +516,7 @@ fun Desktop(activity: MainActivity) {
             if (s.menuBar) MenuBar(onApps = { openLaunchpad(false) }, onSearch = { openLaunchpad(true) }, onSettings = { settingsOpen = true },
                 onWidgets = { widgetPicker = true }, onWallpaper = { wallpaper = true })
             else Spacer(Modifier.statusBarsPadding())
-            BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()
+            BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp)
                 .pointerInput(s.swipeUp, s.swipeDown) {
                     var dy = 0f
                     detectVerticalDragGestures(onDragEnd = { if (dy < -120) gesture(s.swipeUp) else if (dy > 120) gesture(s.swipeDown); dy = 0f }) { _, d -> dy += d }
