@@ -1,5 +1,9 @@
 # Launcher changelog
 
+## v0.5.19
+
+- Menu bar has two sliders with a live mock. Gap above the bar goes from 0 to 32 dp. Bar thickness goes from 24 to 48 dp and defaults to 32. The mock and the home screen update with each step.
+
 ## v0.5.18
 
 - Home screen settings has a Top padding slider. Set the wallpaper gap above the menu bar from 0 to 32 dp.

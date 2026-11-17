@@ -716,7 +716,7 @@ private fun MenuBar(onApps: () -> Unit, onSearch: () -> Unit, onSettings: () -> 
     // sits below the camera cutout and status bar with room to breathe.
     Column(Modifier.fillMaxWidth().padding(top = st.topPad.dp).background(Brush.verticalGradient(pal.toolbar.take(2).map { it.copy(alpha = 1f) }))
         .windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Top)).statusBarsPadding().padding(bottom = 2.dp)) {
-        Row(Modifier.fillMaxWidth().height(32.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().height(st.barHeight.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Box {
                 val art = remember { context.appArt(64) }
                 Row(Modifier.clip(RoundedCornerShape(4.dp)).clickable { orb = true }.padding(horizontal = 4.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -1509,8 +1509,22 @@ private fun LauncherSettings(onClose: () -> Unit, onWallpaper: () -> Unit) {
                     Text("Rows: ${s.rows}", style = MaterialTheme.typography.titleSmall); Segmented(listOf("4", "5", "6", "7"), s.rows - 4) { set(s.copy(rows = it + 4)) }
                     Text("Icon size", style = MaterialTheme.typography.titleSmall)
                     Slider(s.iconScale, { set(s.copy(iconScale = it)) }, valueRange = .75f..1.3f)
-                    Text("Top padding: ${s.topPad} dp", style = MaterialTheme.typography.titleSmall)
-                    Slider(s.topPad.toFloat(), { set(s.copy(topPad = it.toInt())) }, valueRange = 0f..32f)
+                    Text("Menu bar", style = MaterialTheme.typography.titleSmall)
+                    Text("Gap ${s.topPad} dp plus bar ${s.barHeight} dp. Drag and watch the mock below. The home screen behind updates too.", style = MaterialTheme.typography.bodySmall, color = wonderPalette().secondaryText)
+                    Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Brush.verticalGradient(listOf(Color(0xFF1B3B8F), Color(0xFF3A1F7A)))).padding(10.dp)) {
+                        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Color(0x33000000)).padding(horizontal = 6.dp, vertical = 4.dp)) {
+                            Spacer(Modifier.height(s.topPad.dp))
+                            Row(Modifier.fillMaxWidth().height(s.barHeight.dp).clip(RoundedCornerShape(6.dp)).background(Brush.verticalGradient(wonderPalette().toolbar.take(2))).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text("Wonderdesk", color = wonderPalette().toolbarText, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                                Spacer(Modifier.weight(1f))
+                                Text("9:41", color = wonderPalette().toolbarText, fontSize = 12.sp, maxLines = 1)
+                            }
+                        }
+                    }
+                    Text("Gap above the bar: ${s.topPad} dp", style = MaterialTheme.typography.titleSmall)
+                    Slider(s.topPad.toFloat(), { set(s.copy(topPad = it.toInt())) }, valueRange = 0f..32f, steps = 31)
+                    Text("Bar thickness: ${s.barHeight} dp", style = MaterialTheme.typography.titleSmall)
+                    Slider(s.barHeight.toFloat(), { set(s.copy(barHeight = it.toInt())) }, valueRange = 24f..48f, steps = 23)
                 }
                 PanelDivider(0.dp)
                 SwitchRow("Allow home screen rotation", s.rotate, { set(s.copy(rotate = it)); (context as? MainActivity)?.applyRotation() }, subtitle = "Off keeps the home screen upright when you turn the phone; apps still rotate"); PanelDivider()
