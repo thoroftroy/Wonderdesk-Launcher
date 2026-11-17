@@ -1,5 +1,9 @@
 # Launcher changelog
 
+## v0.5.18
+
+- Home screen settings has a Top padding slider. Set the wallpaper gap above the menu bar from 0 to 32 dp.
+
 ## v0.5.17
 
 - The menu bar is solid and attached, no longer floating: full-bleed background with content sitting below the camera cutout and status bar, plus breathing room on top
@@ -7,7 +11,7 @@
 
 ## v0.5.16
 
-- The menu bar no longer touches the very top edge of the screen — there's a real wallpaper gap above it, including in full-screen mode
+- The menu bar no longer touches the very top edge of the screen. There's a real wallpaper gap above it, including in full-screen mode
 - Folder changes coming in from Beacon are written to disk before answering, so they can't appear to revert on the next read
 
 ## v0.5.15

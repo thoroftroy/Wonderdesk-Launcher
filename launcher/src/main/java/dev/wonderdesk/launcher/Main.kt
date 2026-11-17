@@ -517,7 +517,7 @@ fun Desktop(activity: MainActivity) {
         Column(Modifier.fillMaxSize()) {
             if (s.menuBar) MenuBar(onApps = { openLaunchpad(false) }, onSearch = { openLaunchpad(true) }, onSettings = { settingsOpen = true },
                 onWidgets = { widgetPicker = true }, onWallpaper = { wallpaper = true })
-            else Spacer(Modifier.statusBarsPadding().windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Top)).padding(top = 8.dp))
+            else Spacer(Modifier.statusBarsPadding().windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Top)).padding(top = s.topPad.dp))
             BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp)
                 .pointerInput(s.swipeUp, s.swipeDown) {
                     var dy = 0f
@@ -714,8 +714,8 @@ private fun MenuBar(onApps: () -> Unit, onSearch: () -> Unit, onSettings: () -> 
     val ink = pal.toolbarText
     // Solid and attached, never floating: the background runs edge to edge while the content
     // sits below the camera cutout and status bar with room to breathe.
-    Column(Modifier.fillMaxWidth().background(Brush.verticalGradient(pal.toolbar.take(2).map { it.copy(alpha = 1f) }))
-        .windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Top)).statusBarsPadding().padding(top = 8.dp, bottom = 2.dp)) {
+    Column(Modifier.fillMaxWidth().padding(top = st.topPad.dp).background(Brush.verticalGradient(pal.toolbar.take(2).map { it.copy(alpha = 1f) }))
+        .windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Top)).statusBarsPadding().padding(bottom = 2.dp)) {
         Row(Modifier.fillMaxWidth().height(32.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Box {
                 val art = remember { context.appArt(64) }
@@ -1509,6 +1509,8 @@ private fun LauncherSettings(onClose: () -> Unit, onWallpaper: () -> Unit) {
                     Text("Rows: ${s.rows}", style = MaterialTheme.typography.titleSmall); Segmented(listOf("4", "5", "6", "7"), s.rows - 4) { set(s.copy(rows = it + 4)) }
                     Text("Icon size", style = MaterialTheme.typography.titleSmall)
                     Slider(s.iconScale, { set(s.copy(iconScale = it)) }, valueRange = .75f..1.3f)
+                    Text("Top padding: ${s.topPad} dp", style = MaterialTheme.typography.titleSmall)
+                    Slider(s.topPad.toFloat(), { set(s.copy(topPad = it.toInt())) }, valueRange = 0f..32f)
                 }
                 PanelDivider(0.dp)
                 SwitchRow("Allow home screen rotation", s.rotate, { set(s.copy(rotate = it)); (context as? MainActivity)?.applyRotation() }, subtitle = "Off keeps the home screen upright when you turn the phone; apps still rotate"); PanelDivider()
