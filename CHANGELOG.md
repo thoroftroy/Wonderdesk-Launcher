@@ -1,5 +1,10 @@
 # Launcher changelog
 
+## v0.5.17
+
+- The menu bar is solid and attached, no longer floating: full-bleed background with content sitting below the camera cutout and status bar, plus breathing room on top
+- Long press the desktop for a New folder item. Tick apps, name it, done.
+
 ## v0.5.16
 
 - The menu bar no longer touches the very top edge of the screen — there's a real wallpaper gap above it, including in full-screen mode

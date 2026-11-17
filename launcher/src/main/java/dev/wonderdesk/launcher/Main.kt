@@ -369,6 +369,8 @@ fun Desktop(activity: MainActivity) {
     var homeMenu by remember { mutableStateOf(false) }
     var pagesDialog by remember { mutableStateOf(false) }
     var addApps by remember { mutableStateOf(false) }
+    var folderPicker by remember { mutableStateOf(false) }
+    var folderNameFor by remember { mutableStateOf<List<String>?>(null) }
     var itemMenu by remember { mutableStateOf<Item?>(null) }
     var dockMenu by remember { mutableStateOf<String?>(null) }
     var widgetMenu by remember { mutableStateOf<Item.Widget?>(null) }
@@ -515,7 +517,7 @@ fun Desktop(activity: MainActivity) {
         Column(Modifier.fillMaxSize()) {
             if (s.menuBar) MenuBar(onApps = { openLaunchpad(false) }, onSearch = { openLaunchpad(true) }, onSettings = { settingsOpen = true },
                 onWidgets = { widgetPicker = true }, onWallpaper = { wallpaper = true })
-            else Spacer(Modifier.statusBarsPadding())
+            else Spacer(Modifier.statusBarsPadding().windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Top)).padding(top = 8.dp))
             BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp)
                 .pointerInput(s.swipeUp, s.swipeDown) {
                     var dy = 0f
@@ -592,7 +594,7 @@ fun Desktop(activity: MainActivity) {
         dockMenu?.let { key -> DockMenu(key) { dockMenu = null } }
         widgetMenu?.let { w -> WidgetMenu(activity, w, onMove = { movingWidget = w; widgetMenu = null }) { widgetMenu = null } }
         if (homeMenu) HomeMenu(page = currentPage, onDismiss = { homeMenu = false }, onWidgets = { widgetPicker = true }, onWallpaper = { wallpaper = true }, onSettings = { settingsOpen = true },
-            onAddApps = { addApps = true }, onPages = { pagesDialog = true }, onAddPage = { val n = Home.addPage(context); scope.launch { pager.animateScrollToPage(pager.currentPage + (n - currentPage)) } },
+            onAddApps = { addApps = true }, onNewFolder = { folderPicker = true }, onPages = { pagesDialog = true }, onAddPage = { val n = Home.addPage(context); scope.launch { pager.animateScrollToPage(pager.currentPage + (n - currentPage)) } },
             onRemovePage = { Home.removePage(context, currentPage).forEach { activity.host.deleteAppWidgetId(it.widgetId) } })
         if (pagesDialog) PagesDialog(current = currentPage, onGo = { i -> scope.launch { pager.scrollToPage(pager.currentPage + (i - currentPage)) } },
             onDelete = { i -> Home.removePage(context, i).forEach { activity.host.deleteAppWidgetId(it.widgetId) } }) { pagesDialog = false }
@@ -600,6 +602,19 @@ fun Desktop(activity: MainActivity) {
             var placed = 0; keys.forEach { if (Home.addShortcut(context, it, currentPage)) placed++ }
             if (placed < keys.size) toast.value("Some apps didn't fit")
         }
+        if (folderPicker) AppChooser("Pick apps for the new folder", already = emptySet(), onDismiss = { folderPicker = false }) { keys -> folderPicker = false; folderNameFor = keys }
+        folderNameFor?.let { keys -> InputDialog("New folder", "Folder name", initial = Home.suggestFolderName(keys).takeIf { it != "Folder" } ?: "", confirm = "Create", onDismiss = { folderNameFor = null }) { n ->
+            folderNameFor = null
+            val spot = Home.freeCell(currentPage)
+            if (spot == null) toast.value("No room on this page. Make space or add a page")
+            else {
+                Home.items = Home.items.filter { !((it as? Item.Shortcut)?.app in keys && it.page == spot.first) } +
+                    Item.Folder(Home.newId(), n.ifBlank { "Folder" }, keys, spot.first, spot.second, spot.third)
+                Home.save(context)
+                if (spot.first != currentPage) Home.jumpTo = spot.first
+                Sounds.play(context, Sounds.S.FolderOpen)
+            }
+        } }
         if (lockGuide) AccessGuide(SpecialAccess.Kind.ACCESSIBILITY, "To lock the screen with a gesture, turn on Wonderdesk's “double-tap to lock” accessibility switch. It only locks the screen and reads nothing.",
             onDismiss = { lockGuide = false }, component = LockService::class.java)
         if (MainActivity.welcome.value) Welcome(activity, onMore = { MainActivity.welcome.value = false; settingsOpen = true }, onWallpaper = { MainActivity.welcome.value = false; wallpaper = true }) { MainActivity.welcome.value = false }
@@ -697,7 +712,10 @@ private fun MenuBar(onApps: () -> Unit, onSearch: () -> Unit, onSettings: () -> 
     val is24 = android.text.format.DateFormat.is24HourFormat(context)
     val pal = wonderPalette()
     val ink = pal.toolbarText
-    Column(Modifier.fillMaxWidth().padding(top = 8.dp).background(Brush.verticalGradient(pal.toolbar.take(2).map { it.copy(alpha = .93f) })).statusBarsPadding()) {
+    // Solid and attached, never floating: the background runs edge to edge while the content
+    // sits below the camera cutout and status bar with room to breathe.
+    Column(Modifier.fillMaxWidth().background(Brush.verticalGradient(pal.toolbar.take(2).map { it.copy(alpha = 1f) }))
+        .windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Top)).statusBarsPadding().padding(top = 8.dp, bottom = 2.dp)) {
         Row(Modifier.fillMaxWidth().height(32.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Box {
                 val art = remember { context.appArt(64) }
@@ -1098,13 +1116,14 @@ private fun DockMenu(key: String, onDismiss: () -> Unit) {
 }
 
 @Composable
-private fun HomeMenu(page: Int, onDismiss: () -> Unit, onWidgets: () -> Unit, onWallpaper: () -> Unit, onSettings: () -> Unit, onAddApps: () -> Unit, onPages: () -> Unit, onAddPage: () -> Unit, onRemovePage: () -> Unit) {
+private fun HomeMenu(page: Int, onDismiss: () -> Unit, onWidgets: () -> Unit, onWallpaper: () -> Unit, onSettings: () -> Unit, onAddApps: () -> Unit, onNewFolder: () -> Unit, onPages: () -> Unit, onAddPage: () -> Unit, onRemovePage: () -> Unit) {
     var confirmRemove by remember { mutableStateOf(false) }
     val count = Home.items.count { it.page == page }
     WonderDialog(onDismissRequest = onDismiss, title = { Text("Home screen") }, text = {
         Column(Modifier.verticalScroll(rememberScrollState())) {
             Panel {
                 ListRow("Add apps to this page", icon = WonderIcons.AddCircle, tint = Color(0xFF2E9E44), onClick = { onDismiss(); onAddApps() }); PanelDivider()
+                ListRow("New folder", subtitle = "Pick apps, then name it", icon = WonderIcons.CreateNewFolder, tint = Color(0xFF4A90E2), onClick = { onDismiss(); onNewFolder() }); PanelDivider()
                 ListRow("Add a widget", icon = WonderIcons.Widgets, tint = Color(0xFF1E7FE8), onClick = { onDismiss(); onWidgets() }); PanelDivider()
                 ListRow("Desktop & wallpaper", icon = WonderIcons.Wallpaper, tint = Color(0xFF8E44AD), onClick = { onDismiss(); onWallpaper() })
             }
