@@ -726,10 +726,10 @@ private fun MenuBar(onApps: () -> Unit, onSearch: () -> Unit, onSettings: () -> 
     // status bar while the menu bar is on, so the bar is only the gap plus the
     // row plus the divider, and the thickness slider owns all of it.
     Column(Modifier.fillMaxWidth().padding(top = st.topPad.dp).background(Brush.verticalGradient(pal.toolbar.take(2).map { it.copy(alpha = 1f) }))
-        .padding(bottom = 2.dp)) {
+        .padding(bottom = st.barBottom.dp)) {
         // The icons and text shrink with the bar: a fixed 20 dp icon inside a 24 dp
         // row would force the bar back to full height and the slider would look dead.
-        val scale = st.barHeight / 32f
+        val scale = st.barText / 100f
         // A camera hole at the top makes the bar at least as tall as the hole and keeps its buttons clear of corner cutouts.
         val cutTop = with(androidx.compose.ui.platform.LocalDensity.current) { WindowInsets.displayCutout.getTop(this).toDp() }
         Row(Modifier.fillMaxWidth().height(maxOf(st.barHeight.dp, cutTop)).windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Horizontal)).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -1526,14 +1526,18 @@ private fun LauncherSettings(onClose: () -> Unit, onWallpaper: () -> Unit) {
                     Text("Icon size", style = MaterialTheme.typography.titleSmall)
                     Slider(s.iconScale, { set(s.copy(iconScale = it)) }, valueRange = .75f..1.3f)
                     Text("Menu bar", style = MaterialTheme.typography.titleSmall)
-                    Text("Gap ${s.topPad} dp plus bar ${s.barHeight} dp. Drag and watch the real bar below. It is live, not a drawing.", style = MaterialTheme.typography.bodySmall, color = wonderPalette().secondaryText)
+                    Text("Space above ${s.topPad} dp, bar height ${s.barHeight} dp, space below ${s.barBottom} dp, text ${s.barText}%. Drag and watch the real bar below. It is live, not a drawing.", style = MaterialTheme.typography.bodySmall, color = wonderPalette().secondaryText)
                     Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).border(1.dp, wonderPalette().panelBorder, RoundedCornerShape(12.dp))) {
                         MenuBar(onApps = {}, onSearch = {}, onSettings = {}, onWidgets = {}, onWallpaper = {})
                     }
-                    Text("Gap above the bar: ${s.topPad} dp", style = MaterialTheme.typography.titleSmall)
-                    Slider(s.topPad.toFloat(), { set(s.copy(topPad = it.toInt())) }, valueRange = 0f..32f, steps = 31)
-                    Text("Bar thickness: ${s.barHeight} dp", style = MaterialTheme.typography.titleSmall)
-                    Slider(s.barHeight.toFloat(), { set(s.copy(barHeight = it.toInt())) }, valueRange = 24f..48f, steps = 23)
+                    Text("Space above the bar: ${s.topPad} dp", style = MaterialTheme.typography.titleSmall)
+                    Slider(s.topPad.toFloat(), { set(s.copy(topPad = it.toInt())) }, valueRange = 0f..64f, steps = 63)
+                    Text("Bar height (how much room it takes): ${s.barHeight} dp", style = MaterialTheme.typography.titleSmall)
+                    Slider(s.barHeight.toFloat(), { set(s.copy(barHeight = it.toInt())) }, valueRange = 12f..72f, steps = 59)
+                    Text("Space below the bar: ${s.barBottom} dp", style = MaterialTheme.typography.titleSmall)
+                    Slider(s.barBottom.toFloat(), { set(s.copy(barBottom = it.toInt())) }, valueRange = 0f..32f, steps = 31)
+                    Text("Text and icon size: ${s.barText}%", style = MaterialTheme.typography.titleSmall)
+                    Slider(s.barText.toFloat(), { set(s.copy(barText = it.toInt())) }, valueRange = 50f..200f, steps = 29)
                 }
                 PanelDivider(0.dp)
                 SwitchRow("Allow home screen rotation", s.rotate, { set(s.copy(rotate = it)); (context as? MainActivity)?.applyRotation() }, subtitle = "Off keeps the home screen upright when you turn the phone; apps still rotate"); PanelDivider()

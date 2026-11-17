@@ -1,5 +1,10 @@
 # Launcher changelog
 
+## v0.5.23
+
+- Menu bar sliders are now separate: space above, bar height (how much room it takes), space below, and text and icon size
+- Bar height now really changes how much room the bar takes instead of only changing the text size
+
 ## v0.5.22
 
 - The Default home banner and the settings row now agree
