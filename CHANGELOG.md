@@ -1,5 +1,9 @@
 # Launcher changelog
 
+## v0.5.20
+
+- The bar thickness slider now shrinks the icons and text inside the bar too, so the lowest setting is truly thin. The preview shows the real menu bar live instead of a drawing
+
 ## v0.5.19
 
 - Menu bar has two sliders with a live mock. Gap above the bar goes from 0 to 32 dp. Bar thickness goes from 24 to 48 dp and defaults to 32. The mock and the home screen update with each step.

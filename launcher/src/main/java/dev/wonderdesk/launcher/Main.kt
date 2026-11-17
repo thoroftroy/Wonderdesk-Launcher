@@ -716,13 +716,16 @@ private fun MenuBar(onApps: () -> Unit, onSearch: () -> Unit, onSettings: () -> 
     // sits below the camera cutout and status bar with room to breathe.
     Column(Modifier.fillMaxWidth().padding(top = st.topPad.dp).background(Brush.verticalGradient(pal.toolbar.take(2).map { it.copy(alpha = 1f) }))
         .windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Top)).statusBarsPadding().padding(bottom = 2.dp)) {
+        // The icons and text shrink with the bar: a fixed 20 dp icon inside a 24 dp
+        // row would force the bar back to full height and the slider would look dead.
+        val scale = st.barHeight / 32f
         Row(Modifier.fillMaxWidth().height(st.barHeight.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Box {
                 val art = remember { context.appArt(64) }
-                Row(Modifier.clip(RoundedCornerShape(4.dp)).clickable { orb = true }.padding(horizontal = 4.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
-                    art?.let { Image(it, "Wonderdesk menu", Modifier.size(20.dp)) }
-                    Spacer(Modifier.width(6.dp))
-                    Text("Wonderdesk", style = TextStyle(fontWeight = FontWeight.Bold, fontSize = 14.sp, color = ink), maxLines = 1)
+                Row(Modifier.clip(RoundedCornerShape(4.dp)).clickable { orb = true }.padding(horizontal = (4 * scale).dp, vertical = (3 * scale).dp), verticalAlignment = Alignment.CenterVertically) {
+                    art?.let { Image(it, "Wonderdesk menu", Modifier.size((20 * scale).dp)) }
+                    Spacer(Modifier.width((6 * scale).dp))
+                    Text("Wonderdesk", style = TextStyle(fontWeight = FontWeight.Bold, fontSize = 14.sp * scale, color = ink), maxLines = 1)
                 }
                 DropdownMenu(orb, { orb = false }, Modifier.background(pal.panel)) {
                     DropdownMenuItem({ Text("All apps (Beacon)") }, { orb = false; onApps() }, leadingIcon = { Icon(WonderIcons.Apps, null) })
@@ -735,14 +738,14 @@ private fun MenuBar(onApps: () -> Unit, onSearch: () -> Unit, onSettings: () -> 
                 }
             }
             Spacer(Modifier.weight(1f))
-            if (st.barSearch) Icon(WonderIcons.Search, "Search", Modifier.clip(CircleShape).clickable(onClick = onSearch).padding(6.dp).size(20.dp), tint = pal.toolbarIcon)
+            if (st.barSearch) Icon(WonderIcons.Search, "Search", Modifier.clip(CircleShape).clickable(onClick = onSearch).padding((6 * scale).dp).size((20 * scale).dp), tint = pal.toolbarIcon)
             // Date opens Chronicle, time opens Timepiece.
             if (st.barDate) Text(now.format(DateTimeFormatter.ofPattern("EEE d MMM")), Modifier.clip(RoundedCornerShape(4.dp)).clickable {
                 context.openPackageOr("dev.wonderdesk.chronicle", Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_CALENDAR))
-            }.padding(6.dp, 4.dp), style = TextStyle(fontSize = 14.sp, color = ink, fontWeight = FontWeight.Medium), maxLines = 1)
+            }.padding((6 * scale).dp, (4 * scale).dp), style = TextStyle(fontSize = 14.sp * scale, color = ink, fontWeight = FontWeight.Medium), maxLines = 1)
             if (st.barTime) Text(now.format(DateTimeFormatter.ofPattern(if (is24) "HH:mm" else "h:mm a")), Modifier.clip(RoundedCornerShape(4.dp)).clickable {
                 context.openPackageOr("dev.wonderdesk.timepiece", Intent(android.provider.AlarmClock.ACTION_SHOW_ALARMS))
-            }.padding(6.dp, 4.dp), style = TextStyle(fontSize = 14.sp, color = ink, fontWeight = FontWeight.SemiBold), maxLines = 1)
+            }.padding((6 * scale).dp, (4 * scale).dp), style = TextStyle(fontSize = 14.sp * scale, color = ink, fontWeight = FontWeight.SemiBold), maxLines = 1)
         }
         Box(Modifier.fillMaxWidth().height(1.dp).background(pal.toolbarLine.copy(alpha = .7f)))
     }
@@ -1510,16 +1513,9 @@ private fun LauncherSettings(onClose: () -> Unit, onWallpaper: () -> Unit) {
                     Text("Icon size", style = MaterialTheme.typography.titleSmall)
                     Slider(s.iconScale, { set(s.copy(iconScale = it)) }, valueRange = .75f..1.3f)
                     Text("Menu bar", style = MaterialTheme.typography.titleSmall)
-                    Text("Gap ${s.topPad} dp plus bar ${s.barHeight} dp. Drag and watch the mock below. The home screen behind updates too.", style = MaterialTheme.typography.bodySmall, color = wonderPalette().secondaryText)
-                    Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Brush.verticalGradient(listOf(Color(0xFF1B3B8F), Color(0xFF3A1F7A)))).padding(10.dp)) {
-                        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Color(0x33000000)).padding(horizontal = 6.dp, vertical = 4.dp)) {
-                            Spacer(Modifier.height(s.topPad.dp))
-                            Row(Modifier.fillMaxWidth().height(s.barHeight.dp).clip(RoundedCornerShape(6.dp)).background(Brush.verticalGradient(wonderPalette().toolbar.take(2))).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text("Wonderdesk", color = wonderPalette().toolbarText, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-                                Spacer(Modifier.weight(1f))
-                                Text("9:41", color = wonderPalette().toolbarText, fontSize = 12.sp, maxLines = 1)
-                            }
-                        }
+                    Text("Gap ${s.topPad} dp plus bar ${s.barHeight} dp. Drag and watch the real bar below. It is live, not a drawing.", style = MaterialTheme.typography.bodySmall, color = wonderPalette().secondaryText)
+                    Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).border(1.dp, wonderPalette().panelBorder, RoundedCornerShape(12.dp))) {
+                        MenuBar(onApps = {}, onSearch = {}, onSettings = {}, onWidgets = {}, onWallpaper = {})
                     }
                     Text("Gap above the bar: ${s.topPad} dp", style = MaterialTheme.typography.titleSmall)
                     Slider(s.topPad.toFloat(), { set(s.copy(topPad = it.toInt())) }, valueRange = 0f..32f, steps = 31)
