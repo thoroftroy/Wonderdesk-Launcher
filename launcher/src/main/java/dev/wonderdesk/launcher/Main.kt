@@ -218,7 +218,7 @@ private fun Context.openPackageOr(pkg: String, fallback: Intent) {
 }
 
 private val labelStyle @Composable get() = MaterialTheme.typography.labelMedium.copy(
-    color = if (Home.settings.darkLabels) Color(0xFF1B1D21) else Color.White,
+    fontSize = (12 * Home.settings.labelPct / 100f).sp, color = if (Home.settings.darkLabels) Color(0xFF1B1D21) else Color.White,
     shadow = if (Home.settings.darkLabels) null else Shadow(Color.Black.copy(alpha = .8f), Offset(0f, 2f), 6f), fontWeight = FontWeight.Medium)
 
 /* ---------------------------------------------------- drag & drop ------------------------------------------- */
@@ -1544,6 +1544,8 @@ private fun LauncherSettings(onClose: () -> Unit, onWallpaper: () -> Unit) {
                 SwitchRow("Endless page scrolling", s.infinite, { set(s.copy(infinite = it)) }, subtitle = "Swiping past the last page goes back to the first"); PanelDivider()
                 SwitchRow("Show app names", s.labels, { set(s.copy(labels = it)) }); PanelDivider()
                 SwitchRow("Dark names (for light wallpapers)", s.darkLabels, { set(s.copy(darkLabels = it)) }); PanelDivider()
+                Column(Modifier.padding(16.dp, 10.dp)) { Text("App name size: ${s.labelPct}%", style = MaterialTheme.typography.titleSmall); Slider(s.labelPct.toFloat(), { set(s.copy(labelPct = it.toInt())) }, valueRange = 70f..160f) }
+                PanelDivider()
                 SwitchRow("Menu bar", s.menuBar, { set(s.copy(menuBar = it)); (context as? MainActivity)?.applyFullscreen() }, subtitle = "Tap the date for Chronicle and the time for Timepiece")
             }
             Panel(title = "Dock") {

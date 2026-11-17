@@ -1,5 +1,9 @@
 # Launcher changelog
 
+## v0.5.25
+
+- New setting: size of the app names under icons
+
 ## v0.5.24
 
 - Text size and accent colour chosen in Control Room now apply here
