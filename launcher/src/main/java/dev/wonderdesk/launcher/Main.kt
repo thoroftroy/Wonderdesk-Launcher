@@ -1403,7 +1403,7 @@ private fun WallpaperPicker(onClose: () -> Unit) {
                 }
                 if (dayNight) { PanelDivider(0.dp); ListRow("Stop switching", subtitle = "Keeps whatever wallpaper is up now", icon = WonderIcons.Close, danger = true, onClick = { DayNight.clear(context); dayNight = false }) }
             }
-            if (busy) AquaProgress(null, Modifier.fillMaxWidth())
+            if (busy) { Text("Preparing your wallpaper", style = MaterialTheme.typography.titleSmall); Text("Reading the photo and fitting it to your screen", style = MaterialTheme.typography.bodySmall, color = wonderPalette().secondaryText); AquaProgress(null, Modifier.fillMaxWidth()) }
         }
     }
     target?.let { (style, uri) ->

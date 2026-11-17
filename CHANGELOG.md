@@ -1,5 +1,9 @@
 # Launcher changelog
 
+## v0.5.27
+
+- Choosing a wallpaper photo now says what it is doing while it prepares
+
 ## v0.5.26
 
 - New setting: dock icon size
