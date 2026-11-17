@@ -187,7 +187,10 @@ class LockService : AccessibilityService() {
 
 /* ---------------------------------------------------- helpers ----------------------------------------------- */
 
-fun Context.isDefaultHome(): Boolean = packageManager.resolveActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), android.content.pm.PackageManager.MATCH_DEFAULT_ONLY)?.activityInfo?.packageName == packageName
+/** True when Wonderdesk is the home app by either Android's role or the home intent, so every screen agrees. */
+fun Context.isDefaultHome(): Boolean =
+    getSystemService(android.app.role.RoleManager::class.java)?.isRoleHeld(android.app.role.RoleManager.ROLE_HOME) == true ||
+    packageManager.resolveActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), android.content.pm.PackageManager.MATCH_DEFAULT_ONLY)?.activityInfo?.packageName == packageName
 
 /** Where the last tap on an icon landed (window coordinates), so the app can grow out of it. */
 var lastTap: Offset? = null
@@ -623,7 +626,7 @@ fun Desktop(activity: MainActivity) {
         if (lockGuide) AccessGuide(SpecialAccess.Kind.ACCESSIBILITY, "To lock the screen with a gesture, turn on Wonderdesk's “double-tap to lock” accessibility switch. It only locks the screen and reads nothing.",
             onDismiss = { lockGuide = false }, component = LockService::class.java)
         if (MainActivity.welcome.value) Welcome(activity, onMore = { MainActivity.welcome.value = false; settingsOpen = true }, onWallpaper = { MainActivity.welcome.value = false; wallpaper = true }) { MainActivity.welcome.value = false }
-        if (!Home.ready) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Color.White) }
+        if (!Home.ready) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("Setting up your desktop…", color = Color.White) }
     }
 }
 
@@ -727,7 +730,9 @@ private fun MenuBar(onApps: () -> Unit, onSearch: () -> Unit, onSettings: () -> 
         // The icons and text shrink with the bar: a fixed 20 dp icon inside a 24 dp
         // row would force the bar back to full height and the slider would look dead.
         val scale = st.barHeight / 32f
-        Row(Modifier.fillMaxWidth().height(st.barHeight.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        // A camera hole at the top makes the bar at least as tall as the hole and keeps its buttons clear of corner cutouts.
+        val cutTop = with(androidx.compose.ui.platform.LocalDensity.current) { WindowInsets.displayCutout.getTop(this).toDp() }
+        Row(Modifier.fillMaxWidth().height(maxOf(st.barHeight.dp, cutTop)).windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Horizontal)).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Box {
                 val art = remember { context.appArt(64) }
                 Row(Modifier.clip(RoundedCornerShape(4.dp)).clickable { orb = true }.padding(horizontal = (4 * scale).dp, vertical = (3 * scale).dp), verticalAlignment = Alignment.CenterVertically) {
@@ -1461,7 +1466,7 @@ private fun Welcome(activity: MainActivity, onMore: () -> Unit, onWallpaper: () 
 
 /** What Android must allow for the launcher to work fully. */
 private val APP_NEEDS by lazy { listOf(
-    WonderNeed("Default home app", "Makes the Home button and gesture open Wonderdesk", check = { c -> c.getSystemService(android.app.role.RoleManager::class.java)?.isRoleHeld(android.app.role.RoleManager.ROLE_HOME) ?: true },
+    WonderNeed("Default home app", "Makes the Home button and gesture open Wonderdesk", check = { c -> c.isDefaultHome() },
         fix = { c -> c.launchSafely(android.content.Intent(android.provider.Settings.ACTION_HOME_SETTINGS).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) {} }),
     WonderNeed("Double-tap to lock", "Locks the screen when you double-tap the home screen", required = false, access = SpecialAccess.Kind.ACCESSIBILITY, component = LockService::class.java),
 ) }

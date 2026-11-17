@@ -1,5 +1,11 @@
 # Launcher changelog
 
+## v0.5.22
+
+- The Default home banner and the settings row now agree
+- The menu bar stays clear of a camera hole at the top of the screen
+- Loading text instead of a bare spinner
+
 ## v0.5.21
 
 - The menu bar now replaces the system status bar, so the thickness slider controls the whole bar instead of just the middle row. Swipe from the top to peek at notifications
