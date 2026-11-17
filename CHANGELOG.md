@@ -1,5 +1,9 @@
 # Launcher changelog
 
+## v0.5.21
+
+- The menu bar now replaces the system status bar, so the thickness slider controls the whole bar instead of just the middle row. Swipe from the top to peek at notifications
+
 ## v0.5.20
 
 - The bar thickness slider now shrinks the icons and text inside the bar too, so the lowest setting is truly thin. The preview shows the real menu bar live instead of a drawing

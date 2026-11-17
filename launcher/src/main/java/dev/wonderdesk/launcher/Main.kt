@@ -142,8 +142,13 @@ class MainActivity : ComponentActivity() {
     }
     fun applyFullscreen() {
         val c = androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
-        if (Home.settings.fullscreen) { c.systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE; c.hide(androidx.core.view.WindowInsetsCompat.Type.statusBars()); c.show(androidx.core.view.WindowInsetsCompat.Type.navigationBars()) }
-        else c.show(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+        // The menu bar replaces the system status bar (it already shows the date
+        // and time), so the status bar stays hidden while the menu bar is on.
+        // That keeps system insets out of the bar and the thickness slider in
+        // charge of the whole bar. Swipe from the top to peek at notifications.
+        c.systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        if (Home.settings.fullscreen || Home.settings.menuBar) c.hide(androidx.core.view.WindowInsetsCompat.Type.statusBars()) else c.show(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+        c.show(androidx.core.view.WindowInsetsCompat.Type.navigationBars())
     }
     override fun onWindowFocusChanged(hasFocus: Boolean) { super.onWindowFocusChanged(hasFocus); if (hasFocus) applyFullscreen() }
     override fun onStart() { super.onStart(); runCatching { host.startListening() } }
@@ -714,8 +719,11 @@ private fun MenuBar(onApps: () -> Unit, onSearch: () -> Unit, onSettings: () -> 
     val ink = pal.toolbarText
     // Solid and attached, never floating: the background runs edge to edge while the content
     // sits below the camera cutout and status bar with room to breathe.
+    // No system inset padding here on purpose: applyFullscreen hides the system
+    // status bar while the menu bar is on, so the bar is only the gap plus the
+    // row plus the divider, and the thickness slider owns all of it.
     Column(Modifier.fillMaxWidth().padding(top = st.topPad.dp).background(Brush.verticalGradient(pal.toolbar.take(2).map { it.copy(alpha = 1f) }))
-        .windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Top)).statusBarsPadding().padding(bottom = 2.dp)) {
+        .padding(bottom = 2.dp)) {
         // The icons and text shrink with the bar: a fixed 20 dp icon inside a 24 dp
         // row would force the bar back to full height and the slider would look dead.
         val scale = st.barHeight / 32f
@@ -1433,13 +1441,13 @@ private fun Welcome(activity: MainActivity, onMore: () -> Unit, onWallpaper: () 
             }
             Panel {
                 SwitchRow("Magnifying Dock", s.dockMagnify, { set(s.copy(dockMagnify = it)) }); PanelDivider()
-                SwitchRow("Menu bar", s.menuBar, { set(s.copy(menuBar = it)) }); PanelDivider()
+                SwitchRow("Menu bar", s.menuBar, { set(s.copy(menuBar = it)); (context as? MainActivity)?.applyFullscreen() }); PanelDivider()
                 if (s.menuBar) {
                     SwitchRow("Search in the menu bar", s.barSearch, { set(s.copy(barSearch = it)) }); PanelDivider()
                     SwitchRow("Date in the menu bar", s.barDate, { set(s.copy(barDate = it)) }); PanelDivider()
                     SwitchRow("Clock in the menu bar", s.barTime, { set(s.copy(barTime = it)) }); PanelDivider()
                 }
-                SwitchRow("Full screen", s.fullscreen, { set(s.copy(fullscreen = it)); (context as? MainActivity)?.applyFullscreen() }, subtitle = "Hides the status bar on the home screen (the Back, Home and Recents buttons stay); swipe from the top to peek"); PanelDivider()
+                SwitchRow("Full screen", s.fullscreen, { set(s.copy(fullscreen = it)); (context as? MainActivity)?.applyFullscreen() }, subtitle = "Hides the status bar on the home screen (the Back, Home and Recents buttons stay); swipe from the top to peek. The menu bar replaces the status bar while it is on"); PanelDivider()
                 SwitchRow("Allow home screen rotation", s.rotate, { set(s.copy(rotate = it)); (context as? MainActivity)?.applyRotation() }, subtitle = "Off keeps the home screen upright when you turn the phone; apps still rotate"); PanelDivider()
                 SwitchRow("Endless page scrolling", s.infinite, { set(s.copy(infinite = it)) }); PanelDivider()
                 ListRow("Choose a wallpaper", subtitle = "Wonderdesk's Aqua wallpapers or a photo", icon = WonderIcons.Wallpaper, tint = Color(0xFF8E44AD), chevron = true, onClick = onWallpaper)
@@ -1527,7 +1535,7 @@ private fun LauncherSettings(onClose: () -> Unit, onWallpaper: () -> Unit) {
                 SwitchRow("Endless page scrolling", s.infinite, { set(s.copy(infinite = it)) }, subtitle = "Swiping past the last page goes back to the first"); PanelDivider()
                 SwitchRow("Show app names", s.labels, { set(s.copy(labels = it)) }); PanelDivider()
                 SwitchRow("Dark names (for light wallpapers)", s.darkLabels, { set(s.copy(darkLabels = it)) }); PanelDivider()
-                SwitchRow("Menu bar", s.menuBar, { set(s.copy(menuBar = it)) }, subtitle = "Tap the date for Chronicle and the time for Timepiece")
+                SwitchRow("Menu bar", s.menuBar, { set(s.copy(menuBar = it)); (context as? MainActivity)?.applyFullscreen() }, subtitle = "Tap the date for Chronicle and the time for Timepiece")
             }
             Panel(title = "Dock") {
                 SwitchRow("Magnify icons", s.dockMagnify, { set(s.copy(dockMagnify = it)) }, subtitle = "Icons grow as your finger moves across the Dock"); PanelDivider()
