@@ -1,5 +1,9 @@
 # Launcher changelog
 
+## v0.5.26
+
+- New setting: dock icon size
+
 ## v0.5.25
 
 - New setting: size of the app names under icons

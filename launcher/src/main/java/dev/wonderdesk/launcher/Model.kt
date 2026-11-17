@@ -83,6 +83,8 @@ data class Settings(
     val barBottom: Int = 2,
     /** App name size under icons, in percent. */
     val labelPct: Int = 100,
+    /** Dock icon size, in percent. */
+    val dockPct: Int = 100,
 ) {
     /** What the icon renderer gets: the style plus the icon pack, if any. */
     val iconKey get() = if (iconPack.isBlank()) iconStyle else "$iconStyle|pack:$iconPack"
@@ -90,14 +92,14 @@ data class Settings(
         .put("dockLabels", dockLabels).put("menuBar", menuBar).put("pages", pages).put("swipeUp", swipeUp).put("swipeDown", swipeDown).put("doubleTap", doubleTap)
         .put("lpSort", launchpadSort).put("darkLabels", darkLabels).put("iconStyle", iconStyle).put("reflections", reflections).put("askDefault", askDefault)
         .put("infinite", infinite).put("defaultPage", defaultPage).put("lpFoldersFirst", lpFoldersFirst).put("beaconLaunchpad", beaconLaunchpad).put("rotate", rotate).put("iconPack", iconPack).put("sounds", sounds)
-        .put("barSearch", barSearch).put("barDate", barDate).put("barTime", barTime).put("fullscreen", fullscreen).put("topPad", topPad).put("barHeight", barHeight).put("barText", barText).put("barBottom", barBottom).put("labelPct", labelPct)
+        .put("barSearch", barSearch).put("barDate", barDate).put("barTime", barTime).put("fullscreen", fullscreen).put("topPad", topPad).put("barHeight", barHeight).put("barText", barText).put("barBottom", barBottom).put("labelPct", labelPct).put("dockPct", dockPct)
 
     companion object {
         fun from(o: JSONObject) = Settings(o.optInt("cols", 4), o.optInt("rows", 5), o.optDouble("iconScale", 1.0).toFloat(), o.optBoolean("labels", true), o.optBoolean("magnify", true),
             o.optBoolean("dockLabels"), o.optBoolean("menuBar", true), o.optInt("pages", 2), o.optString("swipeUp", "launchpad"), o.optString("swipeDown", "notifications"),
             o.optString("doubleTap", "none"), o.optString("lpSort", "name"), o.optBoolean("darkLabels"), o.optString("iconStyle", "natural"), o.optBoolean("reflections", true),
             o.optBoolean("askDefault", true), o.optBoolean("infinite"), o.optInt("defaultPage", 0), o.optBoolean("lpFoldersFirst", true), o.optBoolean("beaconLaunchpad", true), o.optBoolean("rotate", false), o.optString("iconPack", ""), o.optBoolean("sounds", true),
-            o.optBoolean("barSearch", true), o.optBoolean("barDate", true), o.optBoolean("barTime", true), o.optBoolean("fullscreen", false), o.optInt("topPad", 8), o.optInt("barHeight", 32), o.optInt("barText", 100), o.optInt("barBottom", 2), o.optInt("labelPct", 100))
+            o.optBoolean("barSearch", true), o.optBoolean("barDate", true), o.optBoolean("barTime", true), o.optBoolean("fullscreen", false), o.optInt("topPad", 8), o.optInt("barHeight", 32), o.optInt("barText", 100), o.optInt("barBottom", 2), o.optInt("labelPct", 100), o.optInt("dockPct", 100))
     }
 }
 

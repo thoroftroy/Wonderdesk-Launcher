@@ -806,7 +806,7 @@ private fun Dock(drag: DragController, onMenu: (String) -> Unit, haptic: () -> U
     BoxWithConstraints(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 10.dp, vertical = 6.dp).onGloballyPositioned { drag.dockRect = it.boundsInRoot() }, contentAlignment = Alignment.BottomCenter) {
     // Icons shrink to fit when the Dock is full (room is left for the magnified icon and a drop gap).
     val slots = apps.size.coerceAtLeast(1) + if (insertAt != null) 1 else 0
-    val base = ((maxWidth - 24.dp) / slots - 6.dp).coerceIn(34.dp, 50.dp)
+    val base = (((maxWidth - 24.dp) / slots - 6.dp).coerceIn(34.dp, 50.dp) * (Home.settings.dockPct / 100f)).coerceIn(28.dp, 72.dp)
         Canvas(Modifier.fillMaxWidth().height(40.dp)) {
             val inset = size.width * .04f
             val path = Path().apply { moveTo(inset, 0f); lineTo(size.width - inset, 0f); lineTo(size.width, size.height); lineTo(0f, size.height); close() }
@@ -1544,6 +1544,8 @@ private fun LauncherSettings(onClose: () -> Unit, onWallpaper: () -> Unit) {
                 SwitchRow("Endless page scrolling", s.infinite, { set(s.copy(infinite = it)) }, subtitle = "Swiping past the last page goes back to the first"); PanelDivider()
                 SwitchRow("Show app names", s.labels, { set(s.copy(labels = it)) }); PanelDivider()
                 SwitchRow("Dark names (for light wallpapers)", s.darkLabels, { set(s.copy(darkLabels = it)) }); PanelDivider()
+                Column(Modifier.padding(16.dp, 10.dp)) { Text("Dock icon size: ${s.dockPct}%", style = MaterialTheme.typography.titleSmall); Slider(s.dockPct.toFloat(), { set(s.copy(dockPct = it.toInt())) }, valueRange = 60f..140f) }
+                PanelDivider()
                 Column(Modifier.padding(16.dp, 10.dp)) { Text("App name size: ${s.labelPct}%", style = MaterialTheme.typography.titleSmall); Slider(s.labelPct.toFloat(), { set(s.copy(labelPct = it.toInt())) }, valueRange = 70f..160f) }
                 PanelDivider()
                 SwitchRow("Menu bar", s.menuBar, { set(s.copy(menuBar = it)); (context as? MainActivity)?.applyFullscreen() }, subtitle = "Tap the date for Chronicle and the time for Timepiece")
