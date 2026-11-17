@@ -1,5 +1,9 @@
 # Launcher changelog
 
+## v0.5.24
+
+- Text size and accent colour chosen in Control Room now apply here
+
 ## v0.5.23
 
 - Menu bar sliders are now separate: space above, bar height (how much room it takes), space below, and text and icon size
