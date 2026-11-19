@@ -1,5 +1,12 @@
 # Launcher changelog
 
+## v0.5.28
+
+- Wallpaper settings rebuilt: switch on "Different wallpapers for day and night" and each look gets its own picture, with the hour it starts right under it. Switch it off for one wallpaper all day
+- New Aqua Bubbles wallpaper: water lit from above with bubbles floating up the screen, plus a Bubbles Night version, and they are the default look (bubbles by day, night water after dark)
+- Any look can be a Wonderdesk style, one photo, a slideshow of photos (fading, with a choice of how often) or a video that loops silently behind your icons
+- Animated looks use Wonderdesk's own live wallpaper, which Android asks you to confirm once. It only draws while the home screen is showing, so it stays easy on the battery
+
 ## v0.5.27
 
 - Choosing a wallpaper photo now says what it is doing while it prepares

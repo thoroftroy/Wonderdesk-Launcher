@@ -159,6 +159,8 @@ class MainActivity : ComponentActivity() {
         Home.refreshIfChanged(this)
         applyRotation()
         if (Home.settings.askDefault && !isDefaultHome()) welcome.value = true
+        // A fresh install starts with Wonderdesk's Aqua wallpaper (bubbles by day, deep water at night).
+        getSharedPreferences("daynight", MODE_PRIVATE).let { sp -> if (!sp.contains("firstRun")) { sp.edit().putBoolean("firstRun", true).apply(); if (welcome.value) Thread { runCatching { DayNight.takeOver(applicationContext, force = true) } }.start() } }
     }
     override fun onPause() { super.onPause(); resumed = false }
     override fun onNewIntent(intent: Intent) {
@@ -1367,7 +1369,8 @@ private fun WallpaperPicker(onClose: () -> Unit) {
     WonderApp(appName = "Wonderdesk", about = "Wallpaper", title = "Desktop & wallpaper", onBack = onClose) {
         toast.value = LocalToast.current
         Page {
-            Panel(title = "Wonderdesk wallpapers") {
+            WallpaperSlots(toast = { toast.value(it) })
+            Panel(title = "Wonderdesk wallpapers", footer = "Tap one to frame it and set it for the home screen, lock screen or both.") {
                 Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Wallpapers.STYLES.chunked(3).forEach { row ->
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -1390,18 +1393,6 @@ private fun WallpaperPicker(onClose: () -> Unit) {
                 PanelDivider()
                 ListRow("Other wallpaper apps", subtitle = "Live wallpapers and your phone's own styles", icon = WonderIcons.Wallpaper, tint = Color(0xFF8E44AD), chevron = true,
                     onClick = { context.launchSafely(Intent.createChooser(Intent(Intent.ACTION_SET_WALLPAPER), "Wallpaper")) {} })
-            }
-            var dayNight by remember { mutableStateOf(DayNight.enabled(context)) }
-            var dayH by remember { mutableIntStateOf(DayNight.dayHour(context)) }
-            var nightH by remember { mutableIntStateOf(DayNight.nightHour(context)) }
-            Panel(title = "Day and night", footer = if (dayNight) "Pick any wallpaper and choose Daytime or Night wallpaper when setting it." else "Pick a wallpaper above and choose “Daytime wallpaper” or “Night wallpaper” when setting it. They swap by themselves at the times below.") {
-                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("Day starts at $dayH:00", style = MaterialTheme.typography.labelLarge)
-                    Slider(dayH.toFloat(), { dayH = it.toInt() }, valueRange = 4f..11f, steps = 6, onValueChangeFinished = { DayNight.setHours(context, dayH, nightH) })
-                    Text("Night starts at $nightH:00", style = MaterialTheme.typography.labelLarge)
-                    Slider(nightH.toFloat(), { nightH = it.toInt() }, valueRange = 16f..23f, steps = 6, onValueChangeFinished = { DayNight.setHours(context, dayH, nightH) })
-                }
-                if (dayNight) { PanelDivider(0.dp); ListRow("Stop switching", subtitle = "Keeps whatever wallpaper is up now", icon = WonderIcons.Close, danger = true, onClick = { DayNight.clear(context); dayNight = false }) }
             }
             if (busy) { Text("Preparing your wallpaper", style = MaterialTheme.typography.titleSmall); Text("Reading the photo and fitting it to your screen", style = MaterialTheme.typography.bodySmall, color = wonderPalette().secondaryText); AquaProgress(null, Modifier.fillMaxWidth()) }
         }

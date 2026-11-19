@@ -23,11 +23,59 @@ object Wallpapers {
     data class Style(val id: String, val name: String)
 
     val STYLES = listOf(
-        Style("aqua", "Aqua"), Style("aqua_dark", "Aqua Night"), Style("graphite", "Graphite"), Style("aurora", "Aurora"),
+        Style("bubbles", "Aqua Bubbles"), Style("bubbles_night", "Bubbles Night"), Style("aqua", "Aqua"), Style("aqua_dark", "Aqua Night"), Style("graphite", "Graphite"), Style("aurora", "Aurora"),
         Style("lagoon", "Lagoon"), Style("pinstripe", "Pinstripe"), Style("dawn", "Dawn"), Style("ember", "Ember"),
     )
 
+    /** Water seen from underneath: light falling from the surface, rays, and shimmer. The bubbles are drawn over it. */
+    fun renderWater(night: Boolean, w: Int, h: Int): Bitmap {
+        val b = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        val c = Canvas(b)
+        val p = Paint(Paint.ANTI_ALIAS_FLAG)
+        val m = max(w, h).toFloat()
+        val stops = if (night) intArrayOf(0xFF0E4A94.toInt(), 0xFF082F6B.toInt(), 0xFF041A44.toInt(), 0xFF010A22.toInt())
+                    else intArrayOf(0xFF7FDCFF.toInt(), 0xFF22A8EE.toInt(), 0xFF0C66C8.toInt(), 0xFF063B8E.toInt())
+        p.shader = LinearGradient(0f, 0f, w * .15f, h.toFloat(), stops, floatArrayOf(0f, .32f, .68f, 1f), Shader.TileMode.CLAMP)
+        c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), p); p.shader = null
+        // The bright patch at the surface.
+        p.shader = RadialGradient(w * .55f, -h * .04f, m * .75f, intArrayOf(if (night) 0x44A9D4FF else 0x99FFFFFF.toInt(), Color.TRANSPARENT), null, Shader.TileMode.CLAMP)
+        c.drawCircle(w * .55f, -h * .04f, m * .75f, p); p.shader = null
+        // Rays of light fanning down from the surface.
+        val rays = floatArrayOf(.08f, .27f, .46f, .66f, .84f)
+        val widths = floatArrayOf(.10f, .06f, .13f, .07f, .09f)
+        rays.forEachIndexed { i, x0 ->
+            val top = w * x0; val spread = w * widths[i]
+            val path = Path().apply { moveTo(top - spread * .4f, 0f); lineTo(top + spread * .4f, 0f); lineTo(top + spread * 2.6f - w * .25f, h * .72f); lineTo(top - spread * 1.6f - w * .25f, h * .72f); close() }
+            p.shader = LinearGradient(0f, 0f, 0f, h * .72f, intArrayOf(if (night) 0x1C9CC8FF else 0x40FFFFFF, Color.TRANSPARENT), null, Shader.TileMode.CLAMP)
+            c.drawPath(path, p)
+        }
+        p.shader = null
+        // Soft shimmer bands, like light moving on the surface above.
+        for (k in 0 until 4) {
+            val path = Path(); val y0 = h * (.06f + k * .05f); val amp = h * .012f
+            path.moveTo(0f, y0)
+            for (i in 0..40) { val x = w * i / 40f; path.lineTo(x, y0 + amp * sin(i / 40f * 7f + k * 1.3f)) }
+            val q = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = m * .006f; color = if (night) 0x1E9CC8FF else 0x30FFFFFF; maskFilter = BlurMaskFilter(m * .006f, BlurMaskFilter.Blur.NORMAL) }
+            c.drawPath(path, q)
+        }
+        // The deep end is darker.
+        p.shader = LinearGradient(0f, h * .55f, 0f, h.toFloat(), intArrayOf(Color.TRANSPARENT, if (night) 0x99000A1C.toInt() else 0x66002A66), null, Shader.TileMode.CLAMP)
+        c.drawRect(0f, h * .55f, w.toFloat(), h.toFloat(), p)
+        return b
+    }
+
+    /** The bubbles wallpaper as a still picture, for previews and for when the animated wallpaper is off. */
+    fun renderBubbles(night: Boolean, w: Int, h: Int): Bitmap {
+        val b = renderWater(night, w, h)
+        val c = Canvas(b)
+        val f = BubbleField(w, h, count = 26, seed = if (night) 5 else 11)
+        f.drawStill(c)
+        return b
+    }
+
     fun render(id: String, w: Int, h: Int): Bitmap {
+        if (id == "bubbles") return renderBubbles(false, w, h)
+        if (id == "bubbles_night") return renderBubbles(true, w, h)
         val b = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
         val c = Canvas(b)
         val p = Paint(Paint.ANTI_ALIAS_FLAG)

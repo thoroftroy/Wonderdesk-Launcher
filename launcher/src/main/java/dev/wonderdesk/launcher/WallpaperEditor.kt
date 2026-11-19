@@ -83,7 +83,7 @@ fun WallpaperEditor(source: Bitmap, onClose: () -> Unit, onDone: (String) -> Uni
             val r = withContext(Dispatchers.Default) { runCatching {
                 val b = render()
                 if (slot != null) { DayNight.save(context, slot, b); DayNight.applyNow(context); "Saved as your $slot wallpaper" }
-                else { WallpaperManager.getInstance(context).setBitmap(b, null, true, flag!!); "Wallpaper set" }
+                else { DayNight.release(context); WallpaperManager.getInstance(context).setBitmap(b, null, true, flag!!); "Wallpaper set" }
             } }
             busy = false
             r.onSuccess { onDone(it) }.onFailure { onDone(it.message ?: "Couldn't set the wallpaper") }
@@ -130,36 +130,53 @@ fun WallpaperEditor(source: Bitmap, onClose: () -> Unit, onDone: (String) -> Uni
     }, confirmButton = { TextButton(onClick = { where = false }) { Text("Cancel") } })
 }
 
-/** Day and night wallpapers: two saved pictures that swap at the hours you choose. */
+/** Day and night wallpapers: switches between the saved looks at the hours you choose (see [WpConfig] for what a look can be). */
 object DayNight {
     private fun prefs(c: Context) = c.getSharedPreferences("daynight", Context.MODE_PRIVATE)
     private fun file(c: Context, slot: String) = File(c.filesDir, "wallpaper-$slot.png")
     fun dayHour(c: Context) = prefs(c).getInt("day", 7)
     fun nightHour(c: Context) = prefs(c).getInt("night", 19)
     fun has(c: Context, slot: String) = file(c, slot).isFile
-    fun enabled(c: Context) = has(c, "day") || has(c, "night")
-    fun setHours(c: Context, day: Int, night: Int) { prefs(c).edit().putInt("day", day).putInt("night", night).apply(); applyNow(c) }
-    fun save(c: Context, slot: String, b: Bitmap) { file(c, slot).outputStream().use { b.compress(Bitmap.CompressFormat.PNG, 100, it) } }
-    fun clear(c: Context) { file(c, "day").delete(); file(c, "night").delete(); c.getSystemService(AlarmManager::class.java).cancel(pending(c)) }
+    fun enabled(c: Context) = WpConfig.dayNight(c)
+    fun setHours(c: Context, day: Int, night: Int) { prefs(c).edit().putInt("day", day).putInt("night", night).apply(); WpConfig.changed(c) }
+    /** Saved from the photo editor: becomes the photo for that time of day. */
+    fun save(c: Context, slot: String, b: Bitmap) {
+        file(c, slot).outputStream().use { b.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        WpConfig.setSource(c, slot, Source("photos", files = listOf(file(c, slot).absolutePath)))
+        if (!WpConfig.dayNight(c)) WpConfig.setDayNight(c, true)
+        takeOver(c)
+    }
+    fun clear(c: Context) { WpConfig.setDayNight(c, false); c.getSystemService(AlarmManager::class.java).cancel(pending(c)) }
 
-    private fun isNight(c: Context): Boolean {
+    fun isNight(c: Context): Boolean {
         val h = java.time.LocalTime.now().hour; val d = dayHour(c); val n = nightHour(c)
         return if (d < n) h !in d until n else h in n until d
     }
 
-    /** Puts up the right picture for the time now and books the next switch. */
-    fun applyNow(c: Context) {
-        val slot = if (isNight(c)) "night" else "day"
-        val f = file(c, slot).takeIf { it.isFile } ?: file(c, if (slot == "night") "day" else "night").takeIf { it.isFile }
-        if (f != null && prefs(c).getString("showing", "") != f.name + f.lastModified()) runCatching {
-            android.graphics.BitmapFactory.decodeFile(f.path)?.let { WallpaperManager.getInstance(c).setBitmap(it, null, true, WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK) }
-            prefs(c).edit().putString("showing", f.name + f.lastModified()).apply()
+    /** Puts up the right look for the time now (as a still picture unless the animated wallpaper is active) and books the next switch. */
+    fun applyNow(c: Context, force: Boolean = false) {
+        val s = WpConfig.current(c)
+        // An animated look is never swapped for a frozen picture unless the person asked for that right now.
+        if (!WpConfig.liveActive(c) && prefs(c).getBoolean("applied", false) && (force || !s.animated)) {
+            val key = s.signature + "|" + (if (isNight(c)) "n" else "d") + "|" + (s.files.firstOrNull()?.let { File(it).lastModified() } ?: 0)
+            if (prefs(c).getString("showing", "") != key) runCatching {
+                val dm = c.resources.displayMetrics
+                val w = minOf(dm.widthPixels, dm.heightPixels); val h = maxOf(dm.widthPixels, dm.heightPixels)
+                WallpaperManager.getInstance(c).setBitmap(WpConfig.staticBitmap(c, s, w, h), null, true, WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK)
+                prefs(c).edit().putString("showing", key).apply()
+            }
         }
-        if (!enabled(c)) return
+        if (!WpConfig.dayNight(c)) { c.getSystemService(AlarmManager::class.java).cancel(pending(c)); return }
         val now = java.time.LocalDateTime.now()
         val next = listOf(dayHour(c), nightHour(c)).map { h -> now.toLocalDate().atTime(h, 0).let { if (it.isAfter(now)) it else it.plusDays(1) } }.minOrNull()!!
         c.getSystemService(AlarmManager::class.java).set(AlarmManager.RTC, next.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli(), pending(c))
     }
+
+    /** From now on Wonderdesk keeps the wallpaper in step with the day and night settings (set once the person has chosen or accepted one). */
+    fun takeOver(c: Context, force: Boolean = false) { prefs(c).edit().putBoolean("applied", true).remove("showing").apply(); applyNow(c, force) }
+    /** The person set a picture by hand: stop swapping it behind their back (the day and night settings stay saved). */
+    fun release(c: Context) { prefs(c).edit().putBoolean("applied", false).apply() }
+    fun tookOver(c: Context) = prefs(c).getBoolean("applied", false)
 
     private fun pending(c: Context) = PendingIntent.getBroadcast(c, 0x0DA1, Intent(c, DayNightReceiver::class.java), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 }
