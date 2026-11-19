@@ -1,5 +1,13 @@
 # Launcher changelog
 
+## v0.5.29
+
+- Dynamic wallpapers, one for each look: Aqua (water, light, floating bubbles, a fish now and then), Bliss (a grass field swaying in the wind under a sun and moon that really cross the sky, moving clouds, sunrises, sunsets, stars and the odd rainbow) and Super (space, rainbows and glowing rings that never stop pulsing). Colours change smoothly through the whole day. They follow your Wonderdesk look by default
+- Tap the wallpaper: bubbles burst with a pop and little drops, the grass sends up dandelion seeds, Super sends out a ring of light
+- Make your own scene: pick the world, shift the colours, follow the clock or speed the day up, choose how often random events happen, turn red when the battery is low, glow while charging, and add rules like "between 22:00 and 6:00 use Super"
+- Wallpaper settings show previews of how it looks on the home screen and the lock screen
+- Lock screen layouts: centred, left stack, low and large or minimal clock, in thin, bold or mono type, with the date, battery level and next alarm. They show when the animated wallpaper is also your lock screen
+
 ## v0.5.28
 
 - Wallpaper settings rebuilt: switch on "Different wallpapers for day and night" and each look gets its own picture, with the hour it starts right under it. Switch it off for one wallpaper all day

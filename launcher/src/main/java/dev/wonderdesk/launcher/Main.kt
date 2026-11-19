@@ -83,6 +83,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -523,7 +524,16 @@ fun Desktop(activity: MainActivity) {
     if (widgetPicker) { WidgetPicker(activity, currentPage) { widgetPicker = false }; return }
     if (wallpaper) { WallpaperPicker { wallpaper = false }; return }
 
-    Box(Modifier.fillMaxSize()) {
+    val rootView = androidx.compose.ui.platform.LocalView.current
+    Box(Modifier.fillMaxSize().pointerInput(Unit) {
+        // A quick tap is passed on to the animated wallpaper, so bubbles pop and the grass ripples where you touch.
+        awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false, pass = androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+            val up = waitForUpOrCancellation(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+            if (up != null && (up.position - down.position).getDistance() < 28f && up.uptimeMillis - down.uptimeMillis < 350)
+                runCatching { WallpaperManager.getInstance(rootView.context).sendWallpaperCommand(rootView.windowToken, WallpaperManager.COMMAND_TAP, up.position.x.toInt(), up.position.y.toInt(), 0, null) }
+        }
+    }) {
         Column(Modifier.fillMaxSize()) {
             if (s.menuBar) MenuBar(onApps = { openLaunchpad(false) }, onSearch = { openLaunchpad(true) }, onSettings = { settingsOpen = true },
                 onWidgets = { widgetPicker = true }, onWallpaper = { wallpaper = true })

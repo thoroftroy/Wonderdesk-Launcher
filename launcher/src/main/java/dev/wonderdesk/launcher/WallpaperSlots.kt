@@ -51,6 +51,7 @@ fun WallpaperSlots(toast: (String) -> Unit) {
     var choosing by remember { mutableStateOf<String?>(null) }
     var pickSlot by remember { mutableStateOf("all") }
     var working by remember { mutableStateOf<String?>(null) }
+    var editingScene by remember { mutableStateOf(false) }
     val resumed = rememberIsResumed()
     val live = remember(resumed, tick) { WpConfig.liveActive(context) }
     val took = remember(resumed, tick) { DayNight.tookOver(context) }
@@ -85,9 +86,10 @@ fun WallpaperSlots(toast: (String) -> Unit) {
         val thumb by produceState<Bitmap?>(null, s.signature, tick) { value = withContext(Dispatchers.Default) { runCatching { WpConfig.staticBitmap(context, s, 180, 320) }.getOrNull() } }
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                Box(Modifier.width(76.dp).aspectRatio(9f / 16f).clip(RoundedCornerShape(10.dp)).background(p.window).border(1.dp, p.panelBorder, RoundedCornerShape(10.dp))) {
-                    thumb?.let { Image(it.asImageBitmap(), title, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
-                }
+                val lookNow = remember(tick) { LockLook.load(context) }
+                val home = remember(thumb) { thumb?.let { homePreview(it) } }
+                val lock = remember(thumb, lookNow) { thumb?.let { lockPreview(context, it, lookNow) } }
+                PhoneThumb(home, "Home"); PhoneThumb(lock, "Lock")
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) { androidx.compose.material3.Icon(icon, null, tint = tint, modifier = Modifier.size(20.dp)); Spacer(Modifier.width(6.dp)); Text(title, style = MaterialTheme.typography.titleMedium) }
                     Text(s.describe(), style = MaterialTheme.typography.bodySmall, color = p.secondaryText)
@@ -134,6 +136,8 @@ fun WallpaperSlots(toast: (String) -> Unit) {
             onClick = { runCatching { context.startActivity(WpConfig.switchToLive(context)) }.onFailure { toast("This phone can't use live wallpapers") } })
     } else if (needsLive && live) Panel { ListRow("Animated wallpaper is on", subtitle = "Moving looks are being drawn by Wonderdesk", icon = WonderIcons.CheckCircle, tint = Color(0xFF2E9E44)) }
 
+    if (editingScene) CustomSceneEditor { editingScene = false; tick++ }
+    LockPanel(WpConfig.source(context, if (WpConfig.dayNight(context)) "day" else "all"), tick) { tick++ }
     choosing?.let { slot ->
         val name = when (slot) { "day" -> "daytime"; "night" -> "night"; else -> "your" }
         WonderDialog(onDismissRequest = { choosing = null }, title = { Text("Choose $name wallpaper") }, text = {
@@ -147,6 +151,16 @@ fun WallpaperSlots(toast: (String) -> Unit) {
                     PanelDivider()
                     ListRow("A video", subtitle = "Plays silently and loops behind your icons", icon = WonderIcons.Movie, tint = Color(0xFF8E44AD), chevron = true,
                         onClick = { pickSlot = slot; choosing = null; oneVideo.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)) })
+                }
+                SectionLabel("Dynamic scenes")
+                Panel {
+                    listOf(Triple("For my theme", "Aqua, Bliss or Super to match your Wonderdesk look", "theme"), Triple("Aqua", "Water, light and bubbles you can pop", "aqua"), Triple("Bliss", "A grass field, a moving sun and moon, clouds and stars", "bliss"),
+                        Triple("Super", "Space, rainbows and glowing rings", "super")).forEachIndexed { i, (n, d, id) ->
+                        if (i > 0) PanelDivider()
+                        ListRow(n, subtitle = d, icon = WonderIcons.Wallpaper, tint = Color(0xFF1E7FE8), onClick = { saved(slot, Source("scene", id)); choosing = null })
+                    }
+                    PanelDivider()
+                    ListRow("My own scene…", subtitle = "Choose the world, time, events and rules", icon = WonderIcons.Tune, tint = Color(0xFF8E44AD), chevron = true, onClick = { choosing = null; saved(slot, Source("scene", "custom")); editingScene = true })
                 }
                 SectionLabel("Wonderdesk styles")
                 Wallpapers.STYLES.chunked(3).forEach { row ->

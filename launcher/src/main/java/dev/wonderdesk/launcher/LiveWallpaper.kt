@@ -29,6 +29,7 @@ import org.json.JSONObject
 import java.io.File
 import java.util.Random
 import kotlin.math.PI
+import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
@@ -40,12 +41,13 @@ import kotlin.math.sin
  * ==================================================================================================== */
 
 data class Source(val kind: String, val id: String = "", val files: List<String> = emptyList(), val seconds: Int = 30) {
-    val animated get() = (kind == "style" && id.startsWith("bubbles")) || kind == "video" || (kind == "photos" && files.size > 1)
+    val animated get() = (kind == "style" && id.startsWith("bubbles")) || kind == "scene" || kind == "video" || (kind == "photos" && files.size > 1)
     val signature get() = "$kind|$id|${files.joinToString(",")}|$seconds"
 
     fun toJson() = JSONObject().put("kind", kind).put("id", id).put("files", JSONArray(files)).put("seconds", seconds)
 
     fun describe(): String = when (kind) {
+        "scene" -> when (id) { "theme", "" -> "Dynamic scene for your theme"; "custom" -> "Your custom scene"; else -> SceneConfig.name(id) + " dynamic scene" }
         "style" -> (Wallpapers.STYLES.firstOrNull { it.id == id }?.name ?: "Wonderdesk style") + if (animated) " (animated)" else ""
         "photos" -> if (files.size > 1) "Slideshow of ${files.size} photos, changes every ${if (seconds < 60) "$seconds seconds" else if (seconds < 3600) "${seconds / 60} minutes" else "hour"}" else "Your photo"
         "video" -> "Your video, looping"
@@ -65,7 +67,7 @@ object WpConfig {
     fun dir(c: Context) = File(c.filesDir, "wp").apply { mkdirs() }
 
     /** Separate day and night wallpapers (on by default) or one for the whole day. */
-    fun dayNight(c: Context) = prefs(c).getBoolean("dayNight", true)
+    fun dayNight(c: Context) = prefs(c).getBoolean("dayNight", false)
     fun setDayNight(c: Context, on: Boolean) { prefs(c).edit().putBoolean("dayNight", on).apply(); changed(c) }
 
     fun source(c: Context, slot: String): Source {
@@ -73,14 +75,14 @@ object WpConfig {
         // Wallpapers saved by older versions as day or night pictures.
         val legacy = File(c.filesDir, "wallpaper-$slot.png")
         if (legacy.isFile) return Source("photos", files = listOf(legacy.absolutePath))
-        return when (slot) { "night" -> Source.NIGHT; else -> Source.DAY }
+        return when (slot) { "night" -> Source.NIGHT; "all" -> Source("scene", "theme"); else -> Source.DAY }
     }
 
     fun setSource(c: Context, slot: String, s: Source) { prefs(c).edit().putString("src_$slot", s.toJson().toString()).apply(); changed(c) }
 
     /** The slot showing right now. */
     fun currentSlot(c: Context) = if (!dayNight(c)) "all" else if (DayNight.isNight(c)) "night" else "day"
-    fun current(c: Context): Source = source(c, currentSlot(c)).let { if (currentSlot(c) == "all" && prefs(c).getString("src_all", null) == null) source(c, "day") else it }
+    fun current(c: Context): Source = source(c, currentSlot(c))
 
     /** Anything that needs the animated wallpaper to be switched on. */
     fun needsLive(c: Context): Boolean = (if (dayNight(c)) listOf("day", "night") else listOf("all")).any { s -> source(c, s).let { it.animated } }
@@ -100,6 +102,7 @@ object WpConfig {
             val frame = r.getFrameAtTime(1_000_000) ?: r.getFrameAtTime(0); r.release()
             frame?.let { cover(it, w, h) }
         }.getOrNull() } ?: Wallpapers.render("aqua", w, h)
+        "scene" -> SceneRunner.still(SceneConfig.resolve(c, s.id), w, h)
         else -> if (s.id.startsWith("bubbles")) Wallpapers.renderBubbles(s.id == "bubbles_night", w, h) else Wallpapers.render(s.id.ifBlank { "aqua" }, w, h)
     }
 
@@ -130,7 +133,7 @@ object WpConfig {
  * ================================================================================================== */
 
 /** Soft bubbles drifting up through the water. Sprites are drawn once and scaled, so a frame costs very little. */
-class BubbleField(private val w: Int, private val h: Int, count: Int = 26, seed: Long = 11) {
+class BubbleField(private val w: Int, private val h: Int, count: Int = 26, seed: Long = 11, private val popping: Boolean = false) {
     private class B(var x: Float, var y: Float, val r: Float, val speed: Float, val sway: Float, val phase: Float, val alpha: Int)
     private val rnd = Random(seed)
     private val m = max(w, h).toFloat()
@@ -140,6 +143,20 @@ class BubbleField(private val w: Int, private val h: Int, count: Int = 26, seed:
     private val src = Rect(0, 0, sprite.width, sprite.height)
     private val dst = RectF()
     private var t = 0f
+    private class Pop(val x: Float, val y: Float, val r: Float) { var age = 0f; val drops = List(7) { floatArrayOf((it * 51.4f + 20f) * 0.01745f, .6f + (it % 3) * .25f) } }
+    private val pops = ArrayList<Pop>()
+
+    /** A tap: if it lands on a bubble, the bubble bursts into a ring and little drops, and a new one rises later. */
+    fun popAt(px: Float, py: Float): Boolean {
+        if (!popping) return false
+        var best: B? = null; var bd = Float.MAX_VALUE
+        for (b in bubbles) { val x = b.x + sin(t * .6f + b.phase) * b.sway; val d = (x - px) * (x - px) + (b.y - py) * (b.y - py); val reach = b.r + m0 * .03f; if (d < reach * reach && d < bd) { bd = d; best = b } }
+        val b = best ?: return false
+        pops.add(Pop(b.x + sin(t * .6f + b.phase) * b.sway, b.y, b.r))
+        val n = spawn(false); b.x = n.x; b.y = n.y + h * .3f
+        return true
+    }
+    private val m0 get() = max(w, h).toFloat()
 
     private fun spawn(anywhere: Boolean): B {
         val r = m * (.006f + rnd.nextFloat() * rnd.nextFloat() * .03f)
@@ -162,6 +179,7 @@ class BubbleField(private val w: Int, private val h: Int, count: Int = 26, seed:
 
     fun step(dt: Float) {
         t += dt
+        val pi = pops.iterator(); while (pi.hasNext()) { val q = pi.next(); q.age += dt; if (q.age > .6f) pi.remove() }
         for (b in bubbles) {
             b.y -= b.speed * dt
             if (b.y < -b.r * 3) { val n = spawn(false); b.x = n.x; b.y = n.y }
@@ -174,6 +192,17 @@ class BubbleField(private val w: Int, private val h: Int, count: Int = 26, seed:
             dst.set(x - b.r, b.y - b.r, x + b.r, b.y + b.r)
             paint.alpha = b.alpha
             c.drawBitmap(sprite, src, dst, paint)
+        }
+        if (pops.isNotEmpty()) {
+            val pp = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+            for (q in pops) {
+                val f = q.age / .6f; val a = ((1f - f) * 230).toInt()
+                pp.strokeWidth = max(2f, q.r * .12f * (1f - f)); pp.color = Color.argb(a, 235, 248, 255)
+                c.drawCircle(q.x, q.y, q.r * (1f + f * 1.1f), pp)
+                pp.style = Paint.Style.FILL
+                for (d in q.drops) { val dist = q.r * (1f + f * 2.4f * d[1]); pp.color = Color.argb(a, 235, 248, 255); c.drawCircle(q.x + cos(d[0]) * dist, q.y + sin(d[0]) * dist + f * f * q.r, max(1.5f, q.r * .14f * (1f - f)), pp) }
+                pp.style = Paint.Style.STROKE
+            }
         }
     }
 
@@ -203,6 +232,13 @@ class WonderdeskWallpaper : WallpaperService() {
         private var fade = 1f
         private var nextAt = 0L
         private var player: MediaPlayer? = null
+        private var runner: SceneRunner? = null
+        private var sceneCfg = SceneConfig()
+        private var lockLook = LockLook()
+        private var isLock = false
+        private var battery = 100
+        private var charging = false
+        private var batteryAt = 0L
         private var last = 0L
         private val paint = Paint(Paint.FILTER_BITMAP_FLAG)
         private var receiver: BroadcastReceiver? = null
@@ -215,7 +251,7 @@ class WonderdeskWallpaper : WallpaperService() {
         private val frame = object : Runnable { override fun run() { if (!visible) return; drawFrame(); handler.postDelayed(this, if (needsFast()) 33 else 400) } }
         private val clock = object : Runnable { override fun run() { reselect(); handler.postDelayed(this, 60_000) } }
 
-        private fun needsFast(): Boolean { val s = src ?: return false; return s.kind == "style" && s.id.startsWith("bubbles") || incoming != null }
+        private fun needsFast(): Boolean { val s = src ?: return false; return s.kind == "scene" || s.kind == "style" && s.id.startsWith("bubbles") || incoming != null }
 
         override fun onCreate(holder: SurfaceHolder) {
             super.onCreate(holder)
@@ -263,8 +299,11 @@ class WonderdeskWallpaper : WallpaperService() {
                 return   // onSurfaceChanged calls this again once the new surface is there
             }
             src = want
-            releasePlayer(); shown = null; incoming = null; water = null; field = null; photos = emptyList()
+            releasePlayer(); shown = null; incoming = null; water = null; field = null; photos = emptyList(); runner = null
+            lockLook = LockLook.load(this@WonderdeskWallpaper)
+            isLock = runCatching { android.os.Build.VERSION.SDK_INT >= 31 && (wallpaperFlags and android.app.WallpaperManager.FLAG_LOCK) != 0 && (wallpaperFlags and android.app.WallpaperManager.FLAG_SYSTEM) == 0 }.getOrDefault(false)
             when (want.kind) {
+                "scene" -> { sceneCfg = SceneConfig.resolve(this@WonderdeskWallpaper, want.id); runner = SceneRunner(w, h) }
                 "style" -> if (want.id.startsWith("bubbles")) {
                     val night = want.id == "bubbles_night"
                     water = Wallpapers.renderWater(night, w, h); field = BubbleField(w, h, seed = if (night) 5 else 11)
@@ -306,6 +345,10 @@ class WonderdeskWallpaper : WallpaperService() {
             if (s.kind == "video") return   // the player owns the surface
             if (s.kind == "photos" && photos.size > 1) advanceSlideshow(dt)
             field?.step(dt)
+            runner?.let { r ->
+                if (System.currentTimeMillis() - batteryAt > 30_000) { batteryAt = System.currentTimeMillis(); runCatching { val b = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))!!; battery = b.getIntExtra("level", 100) * 100 / b.getIntExtra("scale", 100).coerceAtLeast(1); charging = b.getIntExtra("plugged", 0) != 0 } }
+                r.update(dt, sceneCfg, battery, charging)
+            }
             val c = runCatching { if (android.os.Build.VERSION.SDK_INT >= 26) holder.surface.lockHardwareCanvas() else holder.lockCanvas() }.getOrNull() ?: runCatching { holder.lockCanvas() }.getOrNull() ?: return
             canvasTouched = true
             try {
@@ -313,7 +356,14 @@ class WonderdeskWallpaper : WallpaperService() {
                 if (bg != null) c.drawBitmap(bg, 0f, 0f, null) else shown?.let { c.drawBitmap(it, 0f, 0f, null) } ?: c.drawColor(Color.BLACK)
                 incoming?.let { paint.alpha = (fade * 255).toInt().coerceIn(0, 255); c.drawBitmap(it, 0f, 0f, paint); paint.alpha = 255 }
                 field?.draw(c)
+                runner?.draw(c, sceneCfg)
+                if (isLock || (getSystemService(android.app.KeyguardManager::class.java)?.isKeyguardLocked == true)) LockDraw.draw(c, this@WonderdeskWallpaper, w, h, lockLook)
             } finally { runCatching { holder.surface.unlockCanvasAndPost(c) } }
+        }
+
+        override fun onCommand(action: String?, x: Int, y: Int, z: Int, extras: android.os.Bundle?, resultRequested: Boolean): android.os.Bundle? {
+            if (action == android.app.WallpaperManager.COMMAND_TAP) runner?.tap(x.toFloat(), y.toFloat(), sceneCfg)
+            return null
         }
 
         private fun advanceSlideshow(dt: Float) {
@@ -328,6 +378,67 @@ class WonderdeskWallpaper : WallpaperService() {
                 val next = WpConfig.loadCover(photos[index], w, h)
                 nextAt = System.currentTimeMillis() + (src?.seconds ?: 30) * 1000L
                 if (next != null) { incoming = next; fade = 0f }
+            }
+        }
+    }
+}
+
+/* ====================================================================================================
+ * Lock screen look: a clock layout drawn on the wallpaper when it is the lock screen's.
+ * ================================================================================================== */
+
+data class LockLook(val layout: String = "center", val style: String = "thin", val date: Boolean = true, val battery: Boolean = true, val alarm: Boolean = true) {
+    companion object {
+        private fun prefs(c: Context) = c.getSharedPreferences("lock", Context.MODE_PRIVATE)
+        fun load(c: Context) = LockLook(prefs(c).getString("layout", "center")!!, prefs(c).getString("style", "thin")!!, prefs(c).getBoolean("date", true), prefs(c).getBoolean("battery", true), prefs(c).getBoolean("alarm", true))
+        fun save(c: Context, l: LockLook) { prefs(c).edit().putString("layout", l.layout).putString("style", l.style).putBoolean("date", l.date).putBoolean("battery", l.battery).putBoolean("alarm", l.alarm).apply(); c.sendBroadcast(Intent(WpConfig.ACTION_RELOAD).setPackage(c.packageName)) }
+        val LAYOUTS = listOf("center" to "Centered", "left" to "Left stack", "bottom" to "Low and large", "minimal" to "Minimal")
+        val STYLES = listOf("thin" to "Thin", "bold" to "Bold", "mono" to "Mono")
+    }
+}
+
+object LockDraw {
+    /** The clock, date and small facts, drawn over whatever the wallpaper shows. Also used for the preview. */
+    fun draw(c: Canvas, ctx: Context, w: Int, h: Int, look: LockLook) {
+        val now = java.time.LocalTime.now()
+        val is24 = android.text.format.DateFormat.is24HourFormat(ctx)
+        val time = if (is24) "%02d:%02d".format(now.hour, now.minute) else "%d:%02d".format(if (now.hour % 12 == 0) 12 else now.hour % 12, now.minute)
+        val date = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("EEEE, d MMMM"))
+        val extras = buildList {
+            if (look.battery) runCatching { val b = ctx.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED)); val l = b!!.getIntExtra("level", -1) * 100 / b.getIntExtra("scale", 100).coerceAtLeast(1); add("$l%" + if (b.getIntExtra("plugged", 0) != 0) " ⚡" else "") }
+            if (look.alarm) runCatching { ctx.getSystemService(android.app.AlarmManager::class.java).nextAlarmClock?.let { add("⏰ " + java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT).format(java.util.Date(it.triggerTime))) } }
+        }.joinToString("   ")
+        val m = max(w, h).toFloat()
+        val tf = when (look.style) { "bold" -> android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.BOLD); "mono" -> android.graphics.Typeface.MONOSPACE; else -> android.graphics.Typeface.create("sans-serif-thin", android.graphics.Typeface.NORMAL) }
+        val big = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; typeface = tf; setShadowLayer(m * .014f, 0f, m * .003f, 0xAA000000.toInt()) }
+        val small = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; alpha = 230; typeface = android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.NORMAL); setShadowLayer(m * .008f, 0f, m * .002f, 0x66000000) }
+        when (look.layout) {
+            "left" -> {
+                big.textSize = m * .12f; big.textAlign = Paint.Align.LEFT; small.textSize = m * .026f; small.textAlign = Paint.Align.LEFT
+                val x = w * .08f; var y = h * .52f
+                c.drawText(time, x, y, big); y += m * .045f
+                if (look.date) { c.drawText(date, x, y, small); y += m * .04f }
+                if (extras.isNotEmpty()) c.drawText(extras, x, y, small)
+            }
+            "bottom" -> {
+                big.textSize = m * .2f; big.textAlign = Paint.Align.CENTER; small.textSize = m * .028f; small.textAlign = Paint.Align.CENTER
+                var y = h * .84f
+                c.drawText(time, w / 2f, y, big); y += m * .05f
+                if (look.date) { c.drawText(date, w / 2f, y, small); y += m * .04f }
+                if (extras.isNotEmpty()) c.drawText(extras, w / 2f, y, small)
+            }
+            "minimal" -> {
+                big.textSize = m * .06f; big.textAlign = Paint.Align.CENTER; small.textSize = m * .02f; small.textAlign = Paint.Align.CENTER
+                var y = h * .88f
+                c.drawText(time, w / 2f, y, big); y += m * .03f
+                if (look.date) c.drawText(date, w / 2f, y, small)
+            }
+            else -> {
+                big.textSize = m * .15f; big.textAlign = Paint.Align.CENTER; small.textSize = m * .028f; small.textAlign = Paint.Align.CENTER
+                var y = h * .6f
+                c.drawText(time, w / 2f, y, big); y += m * .05f
+                if (look.date) { c.drawText(date, w / 2f, y, small); y += m * .04f }
+                if (extras.isNotEmpty()) c.drawText(extras, w / 2f, y, small)
             }
         }
     }
