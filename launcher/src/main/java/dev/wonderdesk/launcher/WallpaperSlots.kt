@@ -19,6 +19,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Icon
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -214,7 +220,7 @@ private fun copyVideo(c: Context, slot: String, u: Uri): String {
 }
 
 
-/** One tap to put a dynamic scene on the home screen and on the lock screen, each on its own. */
+/** Pick a dynamic scene for the home screen and the lock screen. Every tap does everything needed so it simply shows up. */
 @Composable
 private fun QuickSetup(tick: Int, changed: () -> Unit, toast: (String) -> Unit, editCustom: () -> Unit) {
     val context = LocalContext.current
@@ -222,29 +228,62 @@ private fun QuickSetup(tick: Int, changed: () -> Unit, toast: (String) -> Unit, 
     val presets = listOf("theme" to "My theme", "aqua" to "Aqua", "bliss" to "Bliss", "super" to "Super", "custom" to "My own")
     val dn = remember(tick) { WpConfig.dayNight(context) }
     val homeSrc = remember(tick) { WpConfig.source(context, "all") }
-    val homeSel = if (dn) "daynight" else if (homeSrc.kind == "scene") homeSrc.id else "other"
+    val homeSel = if (dn) "" else if (homeSrc.kind == "scene") homeSrc.id else ""
     val same = remember(tick) { WpConfig.lockSame(context) }
     val lockSrc = remember(tick) { WpConfig.source(context, "lock") }
-    val lockSel = if (same) "same" else if (lockSrc.kind == "scene") lockSrc.id else "other"
-    val live = remember(tick) { WpConfig.liveActive(context) }
-    fun askLive() { if (!WpConfig.liveActive(context)) runCatching { context.startActivity(WpConfig.switchToLive(context)) }.onFailure { toast("This phone can't use live wallpapers") } }
-    Panel(title = "Quick setup", footer = "Dynamic scenes move with the time of day. “My theme” follows your Wonderdesk look: Aqua for Aqua, Bliss for Bliss and Dark Bliss, Super for Super. When Android asks, choose “Home screen and lock screen” so the lock screen can use it too.") {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Home screen", style = MaterialTheme.typography.labelLarge)
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                presets.forEach { (id, label) -> Chip(label, homeSel == id, {
-                    WpConfig.setDayNight(context, false); WpConfig.setSource(context, "all", Source("scene", id)); DayNight.takeOver(context); askLive(); changed(); if (id == "custom") editCustom()
-                }) }
-                Chip("Day and night", homeSel == "daynight", { WpConfig.setDayNight(context, true); DayNight.takeOver(context); changed() })
+    val lockSel = if (lockSrc.kind == "scene") lockSrc.id else ""
+    var state by remember { mutableStateOf(0) }
+    val live = remember(tick, state) { WpConfig.liveActive(context) }
+    val lockLive = remember(tick, state) { WpConfig.lockIsLive(context) }
+
+    /** Makes the choice real: saves it, switches the animated wallpaper on if it is off, and frees the lock screen to show it. */
+    fun make(lock: Boolean) {
+        DayNight.takeOver(context)
+        if (!WpConfig.liveActive(context)) { runCatching { context.startActivity(WpConfig.switchToLive(context)) }.onFailure { toast("This phone can't use animated wallpapers") }; toast("Choose “Set wallpaper”, then “Home screen and lock screen”") }
+        else if (lock || WpConfig.lockSame(context)) WpConfig.lockUseLive(context)
+        state++; changed()
+    }
+
+    Panel(title = "Animated themes", footer = "Scenes move with the time of day and react when you tap. “My theme” follows your Wonderdesk look: Aqua for Aqua, Bliss for Bliss, Super for Super.") {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("Home screen", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            SceneTiles(presets, homeSel) { id ->
+                WpConfig.setDayNight(context, false); WpConfig.setSource(context, "all", Source("scene", id)); make(false); if (id == "custom") editCustom()
             }
-            Text("Lock screen", style = MaterialTheme.typography.labelLarge)
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Chip("Same as home", lockSel == "same", { WpConfig.setLockSame(context, true); askLive(); changed() })
-                presets.forEach { (id, label) -> Chip(label, lockSel == id, {
-                    WpConfig.setLockSame(context, false); WpConfig.setSource(context, "lock", Source("scene", id)); DayNight.takeOver(context); askLive(); changed(); if (id == "custom") editCustom()
-                }) }
+            HorizontalDivider()
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Lock screen", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                Text("Same as home", style = MaterialTheme.typography.bodySmall, color = p.secondaryText)
+                Spacer(Modifier.width(8.dp))
+                Switch(same, { WpConfig.setLockSame(context, it); make(true) })
             }
-            Text(if (live) "Animated wallpaper is on." else "Turn the animated wallpaper on when Android asks, then pick “Home screen and lock screen”.", style = MaterialTheme.typography.bodySmall, color = p.secondaryText)
+            if (!same) SceneTiles(presets, lockSel) { id -> WpConfig.setLockSame(context, false); WpConfig.setSource(context, "lock", Source("scene", id)); make(true); if (id == "custom") editCustom() }
+            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(if (lockLive) Color(0x1A2E9E44) else Color(0x1AE5A01C)).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(if (!live) "Animated wallpaper is off, so nothing is moving yet." else if (lockLive) "Your lock screen is showing this theme." else "Your lock screen still has its own picture.",
+                    style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                if (!lockLive) { Spacer(Modifier.width(8.dp)); WButton(if (!live) "Turn on" else "Use on lock screen", { make(true) }) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SceneTiles(items: List<Pair<String, String>>, selected: String, onPick: (String) -> Unit) {
+    val context = LocalContext.current
+    val p = wonderPalette()
+    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        items.forEach { (id, label) ->
+            val on = id == selected
+            val thumb by produceState<ImageBitmap?>(null, id) {
+                value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { runCatching { SceneRunner.still(SceneConfig.resolve(context, id), 108, 192).asImageBitmap() }.getOrNull() }
+            }
+            Column(Modifier.width(78.dp).clickable { onPick(id) }, horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(Modifier.size(78.dp, 138.dp).clip(RoundedCornerShape(14.dp)).border(if (on) 3.dp else 1.dp, if (on) p.accent else p.secondaryText.copy(alpha = .3f), RoundedCornerShape(14.dp))) {
+                    thumb?.let { Image(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
+                    if (on) Icon(WonderIcons.Check, null, tint = Color.White, modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(20.dp).clip(CircleShape).background(p.accent).padding(2.dp))
+                }
+                Text(label, style = MaterialTheme.typography.labelMedium, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.padding(top = 4.dp), maxLines = 1)
+            }
         }
     }
 }

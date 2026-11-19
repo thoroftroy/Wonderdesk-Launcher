@@ -94,6 +94,15 @@ object WpConfig {
 
     fun liveActive(c: Context): Boolean = runCatching { WallpaperManager.getInstance(c).wallpaperInfo?.packageName == c.packageName }.getOrDefault(false)
 
+    /** True when the lock screen is showing the animated wallpaper (it has no picture of its own). */
+    fun lockIsLive(c: Context): Boolean = runCatching {
+        val wm = WallpaperManager.getInstance(c)
+        liveActive(c) && (android.os.Build.VERSION.SDK_INT < 24 || wm.getWallpaperId(WallpaperManager.FLAG_LOCK) < 0 || (android.os.Build.VERSION.SDK_INT >= 34 && wm.getWallpaperInfo(WallpaperManager.FLAG_LOCK)?.packageName == c.packageName))
+    }.getOrDefault(false)
+
+    /** Drops any separate picture on the lock screen so it shows the animated wallpaper too. */
+    fun lockUseLive(c: Context): Boolean = runCatching { WallpaperManager.getInstance(c).clear(WallpaperManager.FLAG_LOCK); true }.getOrDefault(false)
+
     fun changed(c: Context) {
         c.sendBroadcast(Intent(ACTION_RELOAD).setPackage(c.packageName))
         Thread { runCatching { DayNight.applyNow(c) } }.start()
@@ -415,8 +424,8 @@ object LockDraw {
         val time = if (is24) "%02d:%02d".format(now.hour, now.minute) else "%d:%02d".format(if (now.hour % 12 == 0) 12 else now.hour % 12, now.minute)
         val date = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("EEEE, d MMMM"))
         val extras = buildList {
-            if (look.battery) runCatching { val b = ctx.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED)); val l = b!!.getIntExtra("level", -1) * 100 / b.getIntExtra("scale", 100).coerceAtLeast(1); add("$l%" + if (b.getIntExtra("plugged", 0) != 0) " ⚡" else "") }
-            if (look.alarm) runCatching { ctx.getSystemService(android.app.AlarmManager::class.java).nextAlarmClock?.let { add("⏰ " + java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT).format(java.util.Date(it.triggerTime))) } }
+            if (look.battery) runCatching { val b = ctx.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED)); val l = b!!.getIntExtra("level", -1) * 100 / b.getIntExtra("scale", 100).coerceAtLeast(1); add("$l%" + if (b.getIntExtra("plugged", 0) != 0) " charging" else "") }
+            if (look.alarm) runCatching { ctx.getSystemService(android.app.AlarmManager::class.java).nextAlarmClock?.let { add("Alarm " + java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT).format(java.util.Date(it.triggerTime))) } }
         }.joinToString("   ")
         val m = max(w, h).toFloat()
         val tf = when (look.style) { "bold" -> android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.BOLD); "mono" -> android.graphics.Typeface.MONOSPACE; else -> android.graphics.Typeface.create("sans-serif-thin", android.graphics.Typeface.NORMAL) }

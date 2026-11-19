@@ -161,23 +161,68 @@ abstract class Scene(val w: Int, val h: Int, seed: Long) {
     }
 }
 
-/** Water, light from above, floating bubbles you can pop, and now and then a fish. */
+/** A soft round glow, painted once and then scaled, tinted and faded for free every frame. */
+private fun glowSprite(n: Int, vararg stops: Int): Bitmap {
+    val b = Bitmap.createBitmap(n, n, Bitmap.Config.ARGB_8888)
+    val p = Paint(Paint.ANTI_ALIAS_FLAG).apply { shader = RadialGradient(n / 2f, n / 2f, n / 2f, stops, null, Shader.TileMode.CLAMP) }
+    Canvas(b).drawCircle(n / 2f, n / 2f, n / 2f, p)
+    return b
+}
+
+/** A soft ring, painted once. */
+private fun ringSprite(n: Int): Bitmap {
+    val b = Bitmap.createBitmap(n, n, Bitmap.Config.ARGB_8888)
+    val p = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = n * .05f; color = Color.WHITE; maskFilter = BlurMaskFilter(n * .035f, BlurMaskFilter.Blur.NORMAL) }
+    Canvas(b).drawCircle(n / 2f, n / 2f, n * .4f, p)
+    return b
+}
+
+private val ADD_MODE = android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.ADD)
+private fun hsv(a: Int, hue: Float, s: Float, v: Float) = Color.HSVToColor(a, floatArrayOf(((hue % 360f) + 360f) % 360f, s, v))
+
+/** Water, light shafts that sway, caustics rippling across the water, bubbles you can pop, drifting specks and now and then a fish. */
 class AquaScene(w: Int, h: Int) : Scene(w, h, 3) {
-    private val field = BubbleField(w, h, count = 28, seed = 11, popping = true)
-    private class Fish(var x: Float, val y: Float, val dir: Int, val size: Float)
+    private val field = BubbleField(w, h, count = 30, seed = 11, popping = true)
+    private class Fish(var x: Float, val y: Float, val size: Float, val dir: Int)
     private val fish = ArrayList<Fish>()
     private var bg: Bitmap? = null
-    private var bgHour = -99f
     private var bgKey = ""
+
+    private class Beam(val x: Float, val wd: Float, val sp: Float, val ph: Float, val str: Float)
+    private val beams = List(8) { Beam(.04f + it * .125f + rnd.nextFloat() * .05f, .12f + rnd.nextFloat() * .16f, .6f + rnd.nextFloat() * .9f, rnd.nextFloat() * 6.28f, .5f + rnd.nextFloat() * .5f) }
+    private val beamSprite: Bitmap = Bitmap.createBitmap(192, 512, Bitmap.Config.ARGB_8888).also { b ->
+        val p = Paint(Paint.ANTI_ALIAS_FLAG).apply { maskFilter = BlurMaskFilter(22f, BlurMaskFilter.Blur.NORMAL); shader = LinearGradient(0f, 0f, 0f, 512f, intArrayOf(0xFFFFFFFF.toInt(), 0x66FFFFFF, 0x00FFFFFF), floatArrayOf(0f, .5f, .95f), Shader.TileMode.CLAMP) }
+        Canvas(b).drawPath(Path().apply { moveTo(80f, 0f); lineTo(112f, 0f); lineTo(170f, 512f); lineTo(22f, 512f); close() }, p)
+    }
+    private val causticTile = makeCaustic(256)
+    private val causticA = android.graphics.BitmapShader(causticTile, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT)
+    private val causticB = android.graphics.BitmapShader(causticTile, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT)
+    private val mat = android.graphics.Matrix()
+    private val addPaint = Paint(Paint.FILTER_BITMAP_FLAG).apply { xfermode = ADD_MODE }
+    private val causticPaint = Paint().apply { xfermode = ADD_MODE }
+    private val motes = List(54) { floatArrayOf(rnd.nextFloat() * w, rnd.nextFloat() * h, m * (.003f + rnd.nextFloat() * .006f), rnd.nextFloat() * 6.28f, m * (.004f + rnd.nextFloat() * .01f)) }
+    private val moteSprite = glowSprite(48, 0xFFFFFFFF.toInt(), 0x66DFF6FF, 0x00FFFFFF)
+    private val src = android.graphics.Rect(); private val dst = RectF()
+    private val fishDir = HashMap<Fish, Int>()
+
+    private fun makeCaustic(n: Int): Bitmap {
+        val px = IntArray(n * n); val tw = (2 * PI / n).toFloat()
+        for (y in 0 until n) for (x in 0 until n) {
+            val f = (sin(tw * (3 * x + 2 * y)) + sin(tw * (-2 * x + 4 * y) + 1.7f) + sin(tw * (5 * x - 3 * y) + 3.1f) + sin(tw * (-4 * x - 5 * y) + .6f)) / 4f
+            var v = 1f - abs(f); v *= v; v *= v; v *= v
+            px[y * n + x] = (((v * 255f * 1.7f).toInt().coerceIn(0, 255)) shl 24) or 0xFFFFFF
+        }
+        return Bitmap.createBitmap(px, n, n, Bitmap.Config.ARGB_8888)
+    }
 
     override fun step(dt: Float, env: Env, cfg: SceneConfig) {
         super.step(dt, env, cfg)
         field.step(dt)
-        scheduleEvents(dt, cfg, false) { fish.add(Fish(if (rnd.nextBoolean()) -m * .1f else w + m * .1f, h * (.3f + rnd.nextFloat() * .4f), 0, m * (.012f + rnd.nextFloat() * .01f)).also { f -> if (f.x > 0) fishDir[f] = -1 else fishDir[f] = 1 }) }
+        scheduleEvents(dt, cfg, false) { val left = rnd.nextBoolean(); val f = Fish(if (left) -m * .1f else w + m * .1f, h * (.3f + rnd.nextFloat() * .4f), m * (.012f + rnd.nextFloat() * .01f), if (left) 1 else -1); fish.add(f); fishDir[f] = f.dir }
         val it = fish.iterator()
         while (it.hasNext()) { val f = it.next(); f.x += (fishDir[f] ?: 1) * m * .09f * dt; if (f.x < -m * .2f || f.x > w + m * .2f) { it.remove(); fishDir.remove(f) } }
+        for (s in motes) { s[1] -= s[4] * dt; s[0] += sin(time * .4f + s[3]) * m * .004f * dt * 8; if (s[1] < -10f) { s[1] = h + 10f; s[0] = rnd.nextFloat() * w } }
     }
-    private val fishDir = HashMap<Fish, Int>()
 
     override fun tap(x: Float, y: Float) { field.popAt(x, y) }
 
@@ -187,171 +232,268 @@ class AquaScene(w: Int, h: Int) : Scene(w, h, 3) {
             val b = bg ?: Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888); val c = Canvas(b)
             val night = nightness(hour)
             val p = Paint(Paint.ANTI_ALIAS_FLAG)
-            p.shader = LinearGradient(0f, 0f, w * .15f, h.toFloat(), intArrayOf(WATER.at(hour, 0), WATER.at(hour, 1), WATER.at(hour, 2)), floatArrayOf(0f, .45f, 1f), Shader.TileMode.CLAMP)
+            p.shader = LinearGradient(0f, 0f, w * .12f, h.toFloat(), intArrayOf(WATER.at(hour, 0), WATER.at(hour, 1), WATER.at(hour, 2)), floatArrayOf(0f, .45f, 1f), Shader.TileMode.CLAMP)
             c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), p); p.shader = null
-            val glow = blend(0x99FFFFFF.toInt(), 0x44A9D4FF, night)
-            p.shader = RadialGradient(w * (.3f + .4f * ((hour % 24) / 24f)), -h * .04f, m * .75f, intArrayOf(glow, Color.TRANSPARENT), null, Shader.TileMode.CLAMP)
-            c.drawCircle(w * (.3f + .4f * ((hour % 24) / 24f)), -h * .04f, m * .75f, p); p.shader = null
-            val rayAlpha = (1f - night * .65f) * 64
-            listOf(.08f to .10f, .27f to .06f, .46f to .13f, .66f to .07f, .84f to .09f).forEach { (x0, wd) ->
-                val top = w * x0; val sp = w * wd
-                val path = Path().apply { moveTo(top - sp * .4f, 0f); lineTo(top + sp * .4f, 0f); lineTo(top + sp * 2.6f - w * .25f, h * .72f); lineTo(top - sp * 1.6f - w * .25f, h * .72f); close() }
-                p.shader = LinearGradient(0f, 0f, 0f, h * .72f, Color.argb(rayAlpha.toInt(), 255, 255, 255), Color.TRANSPARENT, Shader.TileMode.CLAMP); c.drawPath(path, p)
-            }
-            p.shader = LinearGradient(0f, h * .55f, 0f, h.toFloat(), Color.TRANSPARENT, 0x66000A1C, Shader.TileMode.CLAMP); c.drawRect(0f, h * .55f, w.toFloat(), h.toFloat(), p)
+            val gx = w * (.3f + .4f * ((hour % 24) / 24f))
+            p.shader = RadialGradient(gx, -h * .04f, m * .8f, intArrayOf(blend(0xCCFFFFFF.toInt(), 0x554A7FD0, night), Color.TRANSPARENT), null, Shader.TileMode.CLAMP)
+            c.drawCircle(gx, -h * .04f, m * .8f, p); p.shader = null
+            p.shader = LinearGradient(0f, h * .5f, 0f, h.toFloat(), Color.TRANSPARENT, 0x88000A1C.toInt(), Shader.TileMode.CLAMP); c.drawRect(0f, h * .5f, w.toFloat(), h.toFloat(), p)
             bg = b; bgKey = key
         }
         return bg!!
     }
 
     override fun draw(c: Canvas, env: Env, cfg: SceneConfig) {
+        val night = nightness(env.hour); val lit = 1f - night * .65f
         c.drawBitmap(water(env.hour), 0f, 0f, null)
-        val p = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(70, 0, 20, 40) }
+        // caustics: two layers of drifting net, fading out with depth
+        val reach = h * .75f
+        for (layer in 0..1) {
+            val sc = m * (if (layer == 0) .0016f else .0023f)
+            mat.reset(); mat.setScale(sc, sc); mat.postTranslate(time * m * (if (layer == 0) .012f else -.016f), time * m * (if (layer == 0) .008f else .01f))
+            val sh = if (layer == 0) causticA else causticB
+            sh.setLocalMatrix(mat); causticPaint.shader = sh
+            val bands = 16
+            for (i in 0 until bands) {
+                val f = i / bands.toFloat(); causticPaint.alpha = (78f * lit * (1f - f) * (1f - f) * (if (layer == 0) 1f else .75f)).toInt().coerceIn(0, 255)
+                c.drawRect(0f, reach * f, w.toFloat(), reach * (i + 1) / bands + 1f, causticPaint)
+            }
+        }
+        causticPaint.shader = null
+        // light shafts, swaying and breathing
+        src.set(0, 0, beamSprite.width, beamSprite.height)
+        for (bm in beams) {
+            val x = w * bm.x + sin(time * .07f * bm.sp + bm.ph) * w * .06f
+            val a = (.4f + .6f * (sin(time * .22f * bm.sp + bm.ph) * .5f + .5f)) * lit * bm.str * .4f
+            val bw = w * bm.wd * 1.5f
+            c.save(); c.translate(x, -m * .03f); c.rotate(-9f + sin(time * .1f * bm.sp + bm.ph * 1.7f) * 6f)
+            dst.set(-bw / 2f, 0f, bw / 2f, h * .98f); addPaint.alpha = (a * 255).toInt().coerceIn(0, 255)
+            c.drawBitmap(beamSprite, src, dst, addPaint); c.restore()
+        }
+        // specks of sea-life light drifting up
+        val sp = android.graphics.Rect(0, 0, moteSprite.width, moteSprite.height)
+        for (s in motes) { val r = s[2] * 3f; addPaint.alpha = ((.3f + .7f * (sin(time * 1.3f + s[3]) * .5f + .5f)) * 150f * lit).toInt(); dst.set(s[0] - r, s[1] - r, s[0] + r, s[1] + r); c.drawBitmap(moteSprite, sp, dst, addPaint) }
+        val p = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(60, 0, 20, 40) }
         for (f in fish) {
             val d = fishDir[f] ?: 1
             c.save(); c.translate(f.x, f.y + sin(time * 2 + f.x * .01f) * f.size * .3f); c.scale(d.toFloat(), 1f)
-            val body = Path().apply { moveTo(-f.size * 2, 0f); quadTo(0f, -f.size * 1.1f, f.size * 2f, 0f); quadTo(0f, f.size * 1.1f, -f.size * 2, 0f); close() }
-            c.drawPath(body, p)
-            val tail = Path().apply { moveTo(-f.size * 1.8f, 0f); lineTo(-f.size * 3.1f, -f.size); lineTo(-f.size * 3.1f, f.size); close() }
-            c.drawPath(tail, p); c.restore()
+            c.drawPath(Path().apply { moveTo(-f.size * 2, 0f); quadTo(0f, -f.size * 1.1f, f.size * 2f, 0f); quadTo(0f, f.size * 1.1f, -f.size * 2, 0f); close() }, p)
+            c.drawPath(Path().apply { moveTo(-f.size * 1.8f, 0f); lineTo(-f.size * 3.1f, -f.size); lineTo(-f.size * 3.1f, f.size); close() }, p); c.restore()
         }
         field.draw(c)
     }
 }
 
-/** A grass field under a sky that goes through sunrise, noon, sunset and a night of stars. */
+/** A green hill under a sky that goes through sunrise, noon, sunset and a night of stars. Soft light and shadow drift across it. */
 class BlissScene(w: Int, h: Int) : Scene(w, h, 7) {
-    private class Cloud(var x: Float, val y: Float, val size: Float, val speed: Float, val seed: Int)
-    private val clouds = List(7) { Cloud(rnd.nextFloat() * w, h * (.06f + rnd.nextFloat() * .3f), m * (.026f + rnd.nextFloat() * .03f), m * (.004f + rnd.nextFloat() * .01f), rnd.nextInt()) }
-    private val stars = List(160) { floatArrayOf(rnd.nextFloat() * w, rnd.nextFloat() * h * .6f, .4f + rnd.nextFloat() * 1.4f, rnd.nextFloat() * 6.28f) }
-    /** Each cloud is painted once, soft-edged, then tinted and moved every frame. */
-    private val cloudBmp = clouds.map { cl ->
-        val bw = (cl.size * 6.4f).toInt().coerceAtLeast(8); val bh = (cl.size * 3.2f).toInt().coerceAtLeast(8)
-        val b = Bitmap.createBitmap(bw, bh, Bitmap.Config.ARGB_8888); val cv = Canvas(b)
-        val pp = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; maskFilter = BlurMaskFilter(cl.size * .22f, BlurMaskFilter.Blur.NORMAL) }
-        val r = Random(cl.seed.toLong())
-        for (k in 0 until 6) cv.drawCircle(bw / 2f + (k - 2.5f) * cl.size * .55f, bh * .55f - sin(k * 1.1f) * cl.size * .2f + r.nextFloat() * cl.size * .1f, cl.size * (.45f + .25f * r.nextFloat()), pp)
-        b
+    private class Cloud(var x: Float, val y: Float, val size: Float, val speed: Float)
+    private val clouds = List(6) { Cloud(rnd.nextFloat() * w, h * (.06f + rnd.nextFloat() * .3f), m * (.011f + rnd.nextFloat() * .016f), m * (.004f + rnd.nextFloat() * .009f)) }
+    private val stars = List(150) { floatArrayOf(rnd.nextFloat() * w, rnd.nextFloat() * h * .55f, .5f + rnd.nextFloat() * 1.3f, rnd.nextFloat() * 6.28f) }
+    private val cloudBmp: Bitmap = Bitmap.createBitmap(512, 256, Bitmap.Config.ARGB_8888).also { b ->
+        val cv = Canvas(b); val p = Paint(Paint.ANTI_ALIAS_FLAG)
+        val r0 = Random(3)
+        val puffs = List(16) { i -> val px = .16f + .68f * (i / 15f); val arch = sin(PI.toFloat() * (px - .16f) / .68f); Triple(px + (r0.nextFloat() - .5f) * .06f, .66f - arch * (.12f + r0.nextFloat() * .16f), 256f * (.1f + .07f * arch + r0.nextFloat() * .04f)) }
+        for ((px, py, r) in puffs) { p.shader = RadialGradient(512 * px, 256 * (py + .06f), r * 1.1f, intArrayOf(0x88AEBFDC.toInt(), 0x00AEBFDC), null, Shader.TileMode.CLAMP); cv.drawCircle(512 * px, 256 * (py + .06f), r * 1.1f, p) }
+        for ((px, py, r) in puffs) { p.shader = RadialGradient(512 * px, 256 * py, r, intArrayOf(0xFFFFFFFF.toInt(), 0xFFFFFFFF.toInt(), 0xE8FFFFFF.toInt(), 0x00FFFFFF), floatArrayOf(0f, .55f, .8f, 1f), Shader.TileMode.CLAMP); cv.drawCircle(512 * px, 256 * py, r, p) }
     }
     private val cloudPaint = Paint(Paint.FILTER_BITMAP_FLAG)
-    private val horizon = h * .62f
-    private val blades = List(420) { floatArrayOf(rnd.nextFloat() * w, horizon + 8f + rnd.nextFloat().let { it * it } * (h - horizon), rnd.nextFloat() * 6.28f, .5f + rnd.nextFloat()) }
-    private var rainbow = 0f
+    private val gust = glowSprite(256, 0xFFFFFFFF.toInt(), 0x66FFFFFF, 0x00FFFFFF)
+    private val seedSprite = glowSprite(32, 0xFFFFFFFF.toInt(), 0x88FFFFFF.toInt(), 0x00FFFFFF)
+    private val ring = ringSprite(256)
+    private val addPaint = Paint(Paint.FILTER_BITMAP_FLAG).apply { xfermode = ADD_MODE }
+    private val horizon = h * .56f
+    private var ground: Bitmap? = null
+    private var groundKey = ""
+    private val hillClip = Path().apply { moveTo(0f, h * .6f); cubicTo(w * .3f, h * .52f, w * .65f, h * .58f, w.toFloat(), h * .55f); lineTo(w.toFloat(), h.toFloat()); lineTo(0f, h.toFloat()); close() }
+    private class Wave(val x: Float, val y: Float, var age: Float)
+    private val waves = ArrayList<Wave>()
     private val seeds = ArrayList<FloatArray>()
+    private var rainbow = 0f
+    private val src = android.graphics.Rect(); private val dst = RectF()
 
     override fun step(dt: Float, env: Env, cfg: SceneConfig) {
         super.step(dt, env, cfg)
-        for (c in clouds) { c.x += c.speed * dt; if (c.x - c.size * 2.2f > w) c.x = -c.size * 2.6f }
+        for (c in clouds) { c.x += c.speed * dt; if (c.x - c.size * 3.5f > w) c.x = -c.size * 3.5f }
         scheduleEvents(dt, cfg, nightness(env.hour) > .6f) { if (nightness(env.hour) < .4f) rainbow = 1f }
         if (rainbow > 0f) rainbow = (rainbow - dt / 40f).coerceAtLeast(0f)
-        val it = seeds.iterator(); while (it.hasNext()) { val s = it.next(); s[0] += s[2] * dt; s[1] += s[3] * dt; s[4] -= dt / 6f; if (s[4] <= 0f) it.remove() }
+        val wi = waves.iterator(); while (wi.hasNext()) { val x = wi.next(); x.age += dt; if (x.age > 2.4f) wi.remove() }
+        val it = seeds.iterator(); while (it.hasNext()) { val s = it.next(); s[0] += s[2] * dt; s[1] += s[3] * dt; s[4] -= dt / 5f; if (s[4] <= 0f) it.remove() }
     }
 
-    override fun tap(x: Float, y: Float) { repeat(7) { seeds.add(floatArrayOf(x, y, m * (.01f + rnd.nextFloat() * .06f), -m * (.02f + rnd.nextFloat() * .06f), 1f)) } }
+    override fun tap(x: Float, y: Float) {
+        waves.add(Wave(x, y, 0f))
+        repeat(9) { seeds.add(floatArrayOf(x, y, m * (.01f + rnd.nextFloat() * .06f), -m * (.02f + rnd.nextFloat() * .07f), 1f)) }
+    }
+
+    private fun ground(hr: Float): Bitmap {
+        val key = "%.1f".format(hr)
+        if (ground == null || key != groundKey) {
+            val b = ground ?: Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888); b.eraseColor(Color.TRANSPARENT)
+            val c = Canvas(b); val p = Paint(Paint.ANTI_ALIAS_FLAG)
+            val far = GRASS.at(hr, 0); val near = GRASS.at(hr, 1); val sky = SKY.at(hr, 1)
+            fun hill(y0: Float, c1: Float, c2: Float, y1: Float, top: Int, bottom: Int) {
+                val path = Path().apply { moveTo(0f, y0); cubicTo(w * .3f, c1, w * .65f, c2, w.toFloat(), y1); lineTo(w.toFloat(), h.toFloat()); lineTo(0f, h.toFloat()); close() }
+                p.shader = LinearGradient(0f, minOf(y0, y1, c1, c2), 0f, h.toFloat(), top, bottom, Shader.TileMode.CLAMP); c.drawPath(path, p)
+            }
+            hill(h * .60f, h * .52f, h * .58f, h * .55f, blend(far, sky, .45f), blend(far, sky, .25f))
+            hill(h * .66f, h * .57f, h * .64f, h * .61f, blend(far, sky, .12f), near)
+            hill(h * .75f, h * .62f, h * .66f, h * .70f, blend(far, 0xFFFFFFFF.toInt(), .08f), blend(near, 0xFF000000.toInt(), .25f))
+            // a soft glow where the sun hits the hills, and a darker edge at the bottom
+            val warm = (1f - abs(hr - 6.8f).coerceAtMost(1.5f) / 1.5f).coerceAtLeast(1f - abs(hr - 18.5f).coerceAtMost(1.7f) / 1.7f)
+            p.shader = LinearGradient(0f, horizon, 0f, h.toFloat(), Color.argb((warm * 80).toInt(), 255, 170, 90), Color.TRANSPARENT, Shader.TileMode.CLAMP)
+            p.xfermode = android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SRC_ATOP); c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), p)
+            p.shader = LinearGradient(0f, h * .8f, 0f, h.toFloat(), Color.TRANSPARENT, 0x55000000, Shader.TileMode.CLAMP); c.drawRect(0f, h * .8f, w.toFloat(), h.toFloat(), p)
+            // fine grain so the grass reads as grass, not paint
+            p.shader = null; p.strokeWidth = 1.2f
+            val r = Random(5)
+            for (i in 0 until 2600) {
+                val x = r.nextFloat() * w; val y = h * .56f + r.nextFloat().let { it * it } * (h * .44f)
+                p.color = if (r.nextBoolean()) Color.argb(26, 255, 255, 220) else Color.argb(30, 0, 40, 0)
+                c.drawLine(x, y, x + (r.nextFloat() - .5f) * 3f, y - 2f - r.nextFloat() * 7f * (y / h), p)
+            }
+            p.xfermode = null
+            ground = b; groundKey = key
+        }
+        return ground!!
+    }
 
     override fun draw(c: Canvas, env: Env, cfg: SceneConfig) {
         val hr = env.hour; val night = nightness(hr)
         val p = Paint(Paint.ANTI_ALIAS_FLAG)
-        p.shader = LinearGradient(0f, 0f, 0f, horizon, SKY.at(hr, 0), SKY.at(hr, 1), Shader.TileMode.CLAMP); c.drawRect(0f, 0f, w.toFloat(), horizon + 2, p); p.shader = null
-        // stars
-        if (night > .15f) for (s in stars) { p.color = Color.argb((255 * night * (.5f + .5f * sin(time * 1.5f + s[3]))).toInt().coerceIn(0, 255), 255, 255, 255); c.drawCircle(s[0], s[1], s[2], p) }
+        p.shader = LinearGradient(0f, 0f, 0f, h * .62f, SKY.at(hr, 0), SKY.at(hr, 1), Shader.TileMode.CLAMP); c.drawRect(0f, 0f, w.toFloat(), h * .63f, p); p.shader = null
+        if (night > .15f) for (s in stars) { p.color = Color.argb((255 * night * (.5f + .5f * sin(time * 1.4f + s[3]))).toInt().coerceIn(0, 255), 255, 255, 255); c.drawCircle(s[0], s[1], s[2], p) }
         drawStreaks(c)
-        // sun and moon follow their own arcs
-        fun arc(f: Float): Pair<Float, Float> = (w * (.08f + .84f * f)) to (horizon - sin(PI.toFloat() * f) * h * .5f + h * .02f)
+        fun arc(f: Float): Pair<Float, Float> = (w * (.08f + .84f * f)) to (horizon - sin(PI.toFloat() * f) * h * .46f + h * .02f)
         val sunF = (hr - 6f) / 12.7f
         if (sunF in -.05f..1.05f) {
-            val (sx, sy) = arc(sunF.coerceIn(0f, 1f).let { if (sunF < 0 || sunF > 1) sunF else it })
+            val (sx, sy) = arc(sunF)
             val low = 1f - sin(PI.toFloat() * sunF.coerceIn(0f, 1f))
-            p.shader = RadialGradient(sx, sy, m * (.22f + .2f * low), intArrayOf(blend(0xAAFFF2B0.toInt(), 0xCCFF8A4B.toInt(), low), Color.TRANSPARENT), null, Shader.TileMode.CLAMP); c.drawCircle(sx, sy, m * .42f, p); p.shader = null
-            p.color = blend(0xFFFFF6C8.toInt(), 0xFFFFC27A.toInt(), low); c.drawCircle(sx, sy, m * .035f, p)
+            val gr = m * (.25f + .2f * low)
+            dst.set(sx - gr, sy - gr, sx + gr, sy + gr); src.set(0, 0, gust.width, gust.height)
+            addPaint.alpha = 190; addPaint.colorFilter = android.graphics.PorterDuffColorFilter(blend(0xFFFFF2B0.toInt(), 0xFFFF8A4B.toInt(), low), android.graphics.PorterDuff.Mode.MULTIPLY)
+            c.drawBitmap(gust, src, dst, addPaint); addPaint.colorFilter = null
+            p.color = blend(0xFFFFF8D8.toInt(), 0xFFFFC27A.toInt(), low); c.drawCircle(sx, sy, m * .032f, p)
         }
         val moonF = (((hr + 24f - 18f) % 24f)) / 12f
         if (moonF in 0f..1f) {
             val (mx, my) = arc(moonF)
-            p.shader = RadialGradient(mx, my, m * .16f, intArrayOf(0x55CFE3FF, Color.TRANSPARENT), null, Shader.TileMode.CLAMP); c.drawCircle(mx, my, m * .16f, p); p.shader = null
+            dst.set(mx - m * .16f, my - m * .16f, mx + m * .16f, my + m * .16f); addPaint.alpha = 110; c.drawBitmap(gust, src, dst, addPaint)
             p.color = 0xFFF2F5FF.toInt(); c.drawCircle(mx, my, m * .03f, p)
             p.color = blend(SKY.at(hr, 0), SKY.at(hr, 1), .3f); c.drawCircle(mx + m * .012f, my - m * .006f, m * .026f, p)
         }
-        // rainbow
         if (rainbow > 0f) {
-            val a = (min(1f, rainbow * 3f) * min(1f, (1f - rainbow) * 6f + .3f) * 110).toInt()
+            val a = (min(1f, rainbow * 3f) * min(1f, (1f - rainbow) * 6f + .3f) * 100).toInt()
             val rp = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = m * .012f }
-            for (i in 0 until 7) { rp.color = Color.HSVToColor(a, floatArrayOf(i * 42f, .8f, 1f)); c.drawArc(RectF(w * .05f + i * m * .011f, horizon - w * .7f + i * m * .011f, w * .95f - i * m * .011f, horizon + w * .6f - i * m * .011f), 180f, 180f, false, rp) }
+            for (i in 0 until 7) { rp.color = Color.HSVToColor(a, floatArrayOf(i * 42f, .75f, 1f)); c.drawArc(RectF(w * .05f + i * m * .011f, horizon - w * .7f + i * m * .011f, w * .95f - i * m * .011f, horizon + w * .6f - i * m * .011f), 180f, 180f, false, rp) }
         }
-        // clouds, tinted by the sky
         val cloudCol = blend(blend(0xFFFFFFFF.toInt(), 0xFFFFC9A8.toInt(), (1f - abs(hr - 18.3f).coerceAtMost(1.6f) / 1.6f) * .8f), 0xFF3A4670.toInt(), night)
-        cloudPaint.colorFilter = android.graphics.PorterDuffColorFilter(cloudCol, android.graphics.PorterDuff.Mode.MULTIPLY); cloudPaint.alpha = if (night > .5f) 120 else 235
-        clouds.forEachIndexed { i, cl -> val bm = cloudBmp[i]; c.drawBitmap(bm, cl.x - bm.width / 2f, cl.y - bm.height * .55f, cloudPaint) }
-        // hills and grass
-        val far = GRASS.at(hr, 0); val near = GRASS.at(hr, 1)
-        p.color = blend(far, SKY.at(hr, 1), .25f)
-        val hill = Path().apply { moveTo(0f, horizon + 4); for (i in 0..24) lineTo(w * i / 24f, horizon - h * .035f * (sin(i * .55f) * .5f + .5f)); lineTo(w.toFloat(), h.toFloat()); lineTo(0f, h.toFloat()); close() }
-        c.drawPath(hill, p)
-        p.shader = LinearGradient(0f, horizon, 0f, h.toFloat(), far, near, Shader.TileMode.CLAMP); c.drawRect(0f, horizon + h * .03f, w.toFloat(), h.toFloat(), p); p.shader = null
-        val gust = sin(time * .35f) * .5f + .5f
-        val gp = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeCap = Paint.Cap.ROUND }
-        for (b in blades) {
-            val depth = (b[1] - horizon) / (h - horizon)
-            val len = m * (.012f + .05f * depth) * b[3]
-            val sway = (sin(time * 1.6f + b[0] * .012f + b[2]) * .5f + gust * 1.2f) * len * .55f
-            gp.strokeWidth = m * (.0016f + .003f * depth)
-            gp.color = blend(blend(near, far, .5f + .5f * (1f - b[3] / 1.5f)), 0xFFFFFFFF.toInt(), .12f * b[3]).let { blend(it, 0xFF000000.toInt(), (1f - depth) * .08f) }
-            c.drawLine(b[0], b[1], b[0] + sway, b[1] - len, gp)
+        cloudPaint.colorFilter = android.graphics.PorterDuffColorFilter(cloudCol, android.graphics.PorterDuff.Mode.MULTIPLY); cloudPaint.alpha = if (night > .5f) 130 else 245
+        src.set(0, 0, cloudBmp.width, cloudBmp.height)
+        for (cl in clouds) { dst.set(cl.x - cl.size * 5f, cl.y - cl.size * 2.5f, cl.x + cl.size * 5f, cl.y + cl.size * 2.5f); c.drawBitmap(cloudBmp, src, dst, cloudPaint) }
+        c.drawBitmap(ground(hr), 0f, 0f, null)
+        // light and shade rolling over the hills, like wind through grass
+        c.save(); c.clipPath(hillClip)
+        src.set(0, 0, gust.width, gust.height)
+        val warmth = blend(0xFFFFFFFF.toInt(), 0xFFFFC890.toInt(), (1f - abs(hr - 18.5f).coerceAtMost(1.7f) / 1.7f).coerceAtLeast(0f))
+        addPaint.colorFilter = android.graphics.PorterDuffColorFilter(warmth, android.graphics.PorterDuff.Mode.MULTIPLY)
+        for (i in 0 until 4) {
+            val f = ((time * (.018f + i * .006f) + i * .27f) % 1f)
+            val x = -w * .4f + f * w * 1.8f; val y = h * (.64f + i * .08f) + sin(time * .3f + i) * h * .012f
+            dst.set(x - w * .55f, y - h * .05f, x + w * .55f, y + h * .05f)
+            addPaint.alpha = ((1f - night * .7f) * 64f * sin(PI.toFloat() * f)).toInt().coerceIn(0, 255); c.drawBitmap(gust, src, dst, addPaint)
         }
-        // tapped dandelion seeds drifting off
-        gp.color = 0xCCFFFFFF.toInt()
-        for (s in seeds) { gp.alpha = (s[4] * 220).toInt(); gp.strokeWidth = m * .002f; c.drawLine(s[0], s[1], s[0] + m * .008f, s[1] - m * .008f, gp); c.drawCircle(s[0], s[1], m * .003f, p.apply { color = Color.argb((s[4] * 220).toInt(), 255, 255, 255) }) }
-        // warm light across the field at sunrise and sunset
-        val warm = (1f - abs(hr - 6.8f).coerceAtMost(1.5f) / 1.5f).coerceAtLeast(1f - abs(hr - 18.5f).coerceAtMost(1.7f) / 1.7f)
-        if (warm > 0f) { p.shader = LinearGradient(0f, horizon - h * .1f, 0f, h.toFloat(), Color.argb((warm * 70).toInt(), 255, 150, 70), Color.TRANSPARENT, Shader.TileMode.CLAMP); c.drawRect(0f, horizon - h * .1f, w.toFloat(), h.toFloat(), p); p.shader = null }
+        addPaint.colorFilter = null
+        for (wv in waves) {
+            val f = wv.age / 2.4f; val r = f * m * .45f
+            dst.set(wv.x - r, wv.y - r * .45f, wv.x + r, wv.y + r * .45f); src.set(0, 0, ring.width, ring.height)
+            addPaint.alpha = (150 * (1f - f)).toInt().coerceIn(0, 255); c.drawBitmap(ring, src, dst, addPaint)
+        }
+        c.restore()
+        src.set(0, 0, seedSprite.width, seedSprite.height)
+        for (s in seeds) { val r = m * .01f; addPaint.alpha = (s[4] * 230).toInt().coerceIn(0, 255); dst.set(s[0] - r, s[1] - r, s[0] + r, s[1] + r); c.drawBitmap(seedSprite, src, dst, addPaint) }
     }
 }
 
-/** Space, rainbows and glowing rings that do not stop pulsing. */
+/** Space with slow glowing nebulae, a rainbow ribbon, twinkling stars and rings of light that keep spreading out. */
 class SuperScene(w: Int, h: Int) : Scene(w, h, 21) {
-    private val stars = List(320) { floatArrayOf(rnd.nextFloat() * w, rnd.nextFloat() * h, .5f + rnd.nextFloat() * 1.8f, rnd.nextFloat() * 6.28f) }
-    private val blobs = List(6) { floatArrayOf(rnd.nextFloat() * w, rnd.nextFloat() * h, m * (.25f + rnd.nextFloat() * .3f), rnd.nextFloat() * 360f, rnd.nextFloat() * 6.28f) }
+    private class Star(val x: Float, val y: Float, val r: Float, val ph: Float, val depth: Float)
+    private val stars = List(200) { Star(rnd.nextFloat() * w, rnd.nextFloat() * h, .6f + rnd.nextFloat() * 1.6f, rnd.nextFloat() * 6.28f, .3f + rnd.nextFloat() * .7f) }
+    private class Blob(val x: Float, val y: Float, val r: Float, val hue: Float, val ph: Float, val sp: Float)
+    private val blobs = List(7) { Blob(rnd.nextFloat() * w, rnd.nextFloat() * h, m * (.3f + rnd.nextFloat() * .3f), rnd.nextFloat() * 360f, rnd.nextFloat() * 6.28f, .6f + rnd.nextFloat() * .8f) }
+    private val nebula = glowSprite(256, 0xFFFFFFFF.toInt(), 0x66FFFFFF, 0x00FFFFFF)
+    private val star = glowSprite(48, 0xFFFFFFFF.toInt(), 0x66FFFFFF, 0x00FFFFFF)
+    private val ring = ringSprite(512)
+    private val ribbon: Bitmap = Bitmap.createBitmap(1024, 600, Bitmap.Config.ARGB_8888).also { b ->
+        val cv = Canvas(b); val p = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 17f; maskFilter = BlurMaskFilter(14f, BlurMaskFilter.Blur.NORMAL) }
+        for (i in 0 until 7) { p.color = Color.HSVToColor(255, floatArrayOf(i * 51f, .8f, 1f)); cv.drawArc(RectF(60f + i * 15f, 60f + i * 15f, 964f - i * 15f, 1000f - i * 15f), 180f, 180f, false, p) }
+    }
+    private var base: Bitmap? = null
+    private val addPaint = Paint(Paint.FILTER_BITMAP_FLAG).apply { xfermode = ADD_MODE }
+    private val plain = Paint(Paint.FILTER_BITMAP_FLAG)
     private class Ring(val x: Float, val y: Float, var age: Float, val hue: Float)
     private val rings = ArrayList<Ring>()
     private var flash = 0f
+    private val src = android.graphics.Rect(); private val dst = RectF()
 
     override fun step(dt: Float, env: Env, cfg: SceneConfig) {
         super.step(dt, env, cfg)
-        scheduleEvents(dt, cfg, true) { rings.add(Ring(rnd.nextFloat() * w, rnd.nextFloat() * h, 0f, rnd.nextFloat() * 360f)); flash = .5f }
+        scheduleEvents(dt, cfg, true) { rings.add(Ring(rnd.nextFloat() * w, rnd.nextFloat() * h, 0f, rnd.nextFloat() * 360f)); flash = .45f }
         val it = rings.iterator(); while (it.hasNext()) { val r = it.next(); r.age += dt; if (r.age > 5f) it.remove() }
         if (flash > 0) flash -= dt
     }
 
     override fun tap(x: Float, y: Float) { rings.add(Ring(x, y, 0f, (time * 40f) % 360f)) }
 
+    private fun backdrop(): Bitmap {
+        if (base == null) {
+            val b = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888); val c = Canvas(b); val p = Paint()
+            p.shader = LinearGradient(0f, 0f, w * .5f, h.toFloat(), intArrayOf(0xFF07062A.toInt(), 0xFF1A0B4A.toInt(), 0xFF3A0E5C.toInt()), floatArrayOf(0f, .55f, 1f), Shader.TileMode.CLAMP)
+            c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), p)
+            base = b
+        }
+        return base!!
+    }
+
     override fun draw(c: Canvas, env: Env, cfg: SceneConfig) {
-        val hueBase = (time * 6f + env.hour * 15f) % 360f
-        val p = Paint(Paint.ANTI_ALIAS_FLAG)
-        p.shader = LinearGradient(0f, 0f, w * .6f, h.toFloat(), Color.HSVToColor(floatArrayOf((hueBase + 250f) % 360f, .9f, .22f)), Color.HSVToColor(floatArrayOf((hueBase + 300f) % 360f, 1f, .42f)), Shader.TileMode.CLAMP)
-        c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), p); p.shader = null
+        val hueBase = (time * 5f + env.hour * 12f) % 360f
+        c.drawBitmap(backdrop(), 0f, 0f, null)
+        src.set(0, 0, nebula.width, nebula.height)
         for (b in blobs) {
-            val x = b[0] + sin(time * .12f + b[4]) * m * .08f; val y = b[1] + cos(time * .1f + b[4]) * m * .08f
-            p.shader = RadialGradient(x, y, b[2], intArrayOf(Color.HSVToColor(170, floatArrayOf((b[3] + hueBase) % 360f, .9f, 1f)), Color.TRANSPARENT), null, Shader.TileMode.CLAMP); c.drawCircle(x, y, b[2], p)
+            val x = b.x + sin(time * .09f * b.sp + b.ph) * m * .1f; val y = b.y + cos(time * .07f * b.sp + b.ph) * m * .1f
+            val r = b.r * (1f + .08f * sin(time * .2f + b.ph))
+            addPaint.colorFilter = android.graphics.PorterDuffColorFilter(hsv(255, b.hue + hueBase, .85f, 1f), android.graphics.PorterDuff.Mode.MULTIPLY)
+            addPaint.alpha = (95 + 35 * sin(time * .3f + b.ph)).toInt(); dst.set(x - r, y - r, x + r, y + r); c.drawBitmap(nebula, src, dst, addPaint)
         }
-        p.shader = null
-        for (s in stars) { p.color = Color.argb((255 * (.35f + .65f * (sin(time * 2f + s[3]) * .5f + .5f))).toInt(), 255, 255, 255); c.drawCircle(s[0], s[1], s[2], p) }
-        // rainbow arcs that breathe
-        val rp = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = m * .022f; maskFilter = BlurMaskFilter(m * .009f, BlurMaskFilter.Blur.NORMAL) }
-        val pulse = .6f + .4f * sin(time * .8f)
-        for (k in 0 until 2) for (i in 0 until 7) {
-            rp.color = Color.HSVToColor((200 * pulse).toInt(), floatArrayOf(i * 51f, .85f, 1f))
-            val cx = w * (if (k == 0) .15f else .85f); val cy = h * (if (k == 0) .72f else .3f); val r = m * (.35f + i * .016f + .03f * sin(time * .5f + k))
-            c.drawArc(RectF(cx - r, cy - r, cx + r, cy + r), (time * 4f + k * 180f) % 360f, 200f, false, rp)
+        addPaint.colorFilter = null
+        // twinkling stars drifting slowly downward, nearer ones faster
+        src.set(0, 0, star.width, star.height)
+        for (s in stars) {
+            val y = (s.y + time * m * .004f * s.depth) % h
+            val tw = .4f + .6f * (sin(time * 1.8f * s.depth + s.ph) * .5f + .5f)
+            val r = s.r * 2.6f; addPaint.alpha = (255 * tw * s.depth).toInt().coerceIn(0, 255); dst.set(s.x - r, y - r, s.x + r, y + r); c.drawBitmap(star, src, dst, addPaint)
         }
-        // glowing rings that spread out from the middle of the screen, and from taps
-        val gp = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; maskFilter = BlurMaskFilter(m * .008f, BlurMaskFilter.Blur.NORMAL) }
-        for (i in 0 until 8) {
-            val f = ((time * .14f + i / 8f) % 1f); gp.strokeWidth = m * .007f + f * m * .016f
-            gp.color = Color.HSVToColor((235 * (1f - f)).toInt(), floatArrayOf((hueBase + i * 40f) % 360f, .85f, 1f)); c.drawCircle(w / 2f, h * .5f, f * m * .6f, gp)
+        // rainbow ribbons that breathe
+        src.set(0, 0, ribbon.width, ribbon.height)
+        for (k in 0 until 2) {
+            val cx = w * (if (k == 0) .1f else .9f); val cy = h * (if (k == 0) .74f else .26f); val sc = m * (.9f + .05f * sin(time * .4f + k)) / 1024f
+            c.save(); c.translate(cx, cy); c.rotate((time * 2.5f + k * 180f) % 360f); c.scale(sc, sc); dst.set(-512f, -530f, 512f, 70f)
+            addPaint.alpha = (70 + 30 * sin(time * .6f + k)).toInt(); c.drawBitmap(ribbon, src, dst, addPaint); c.restore()
         }
-        for (r in rings) { val f = r.age / 5f; gp.strokeWidth = m * .006f; gp.color = Color.HSVToColor((200 * (1f - f)).toInt(), floatArrayOf((r.hue + r.age * 60f) % 360f, .7f, 1f)); c.drawCircle(r.x, r.y, f * m * .5f, gp) }
+        // rings that spread out from the middle, and from taps
+        src.set(0, 0, ring.width, ring.height)
+        for (i in 0 until 6) {
+            val f = ((time * .1f + i / 6f) % 1f); val r = f * m * .65f
+            addPaint.colorFilter = android.graphics.PorterDuffColorFilter(hsv(255, hueBase + i * 50f, .75f, 1f), android.graphics.PorterDuff.Mode.MULTIPLY)
+            addPaint.alpha = (170 * (1f - f) * min(1f, f * 6f)).toInt().coerceIn(0, 255); dst.set(w / 2f - r, h * .5f - r, w / 2f + r, h * .5f + r); c.drawBitmap(ring, src, dst, addPaint)
+        }
+        for (rg in rings) {
+            val f = rg.age / 5f; val r = f * m * .5f
+            addPaint.colorFilter = android.graphics.PorterDuffColorFilter(hsv(255, rg.hue + rg.age * 60f, .6f, 1f), android.graphics.PorterDuff.Mode.MULTIPLY)
+            addPaint.alpha = (200 * (1f - f)).toInt().coerceIn(0, 255); dst.set(rg.x - r, rg.y - r, rg.x + r, rg.y + r); c.drawBitmap(ring, src, dst, addPaint)
+        }
+        addPaint.colorFilter = null
         drawStreaks(c)
-        if (flash > 0f) { p.color = Color.argb((flash * 90).toInt(), 255, 255, 255); c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), p) }
+        if (flash > 0f) { plain.color = Color.argb((flash * 80).toInt(), 255, 255, 255); c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), plain) }
     }
 }
 

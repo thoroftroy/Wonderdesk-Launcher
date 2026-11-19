@@ -1,5 +1,11 @@
 # Launcher changelog
 
+## v0.5.31
+
+- Wallpaper scenes rebuilt so they look polished and run smoothly. Bliss is a soft green hill with real clouds and light rolling over the grass, Super is glowing nebulae, twinkling stars and rings of light, and Aqua has swaying light shafts, rippling caustics and drifting specks
+- The animated themes setting now shows a live preview of each scene for the home screen and lock screen. Picking one turns it on and sets the lock screen too, and says whether the lock screen is really showing it. If it isn't, one button fixes it
+- The lock screen no longer shows emoji for the charging and alarm lines
+
 ## v0.5.30
 
 - New Quick setup at the top of the wallpaper settings: one tap puts a dynamic scene on the home screen (My theme, Aqua, Bliss, Super, your own, or day and night) and, separately, on the lock screen (same as home, or any of those)
