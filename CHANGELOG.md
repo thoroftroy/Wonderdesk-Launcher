@@ -1,5 +1,11 @@
 # Launcher changelog
 
+## v0.5.30
+
+- New Quick setup at the top of the wallpaper settings: one tap puts a dynamic scene on the home screen (My theme, Aqua, Bliss, Super, your own, or day and night) and, separately, on the lock screen (same as home, or any of those)
+- The lock screen can now show a different scene from the home screen, and it switches when you lock and unlock the phone
+- "My theme" picks the scene that matches your Wonderdesk look
+
 ## v0.5.29
 
 - Dynamic wallpapers, one for each look: Aqua (water, light, floating bubbles, a fish now and then), Bliss (a grass field swaying in the wind under a sun and moon that really cross the sky, moving clouds, sunrises, sunsets, stars and the odd rainbow) and Super (space, rainbows and glowing rings that never stop pulsing). Colours change smoothly through the whole day. They follow your Wonderdesk look by default

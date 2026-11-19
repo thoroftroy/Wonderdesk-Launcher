@@ -106,6 +106,7 @@ fun WallpaperSlots(toast: (String) -> Unit) {
         }
     }
 
+    QuickSetup(tick, { tick++ }, toast) { editingScene = true }
     Panel(title = "Wallpaper", footer = if (dayNight) "Each look can be a Wonderdesk style, a photo, a slideshow or a video. They swap by themselves at the hours below." else "One wallpaper all day. Turn on day and night to have a different one after dark.") {
         if (!took) {
             ListRow("Use Wonderdesk's Aqua wallpaper", subtitle = "Water with floating bubbles by day, deep water at night", icon = WonderIcons.Wallpaper, tint = Color(0xFF1E7FE8), chevron = true,
@@ -137,7 +138,7 @@ fun WallpaperSlots(toast: (String) -> Unit) {
     } else if (needsLive && live) Panel { ListRow("Animated wallpaper is on", subtitle = "Moving looks are being drawn by Wonderdesk", icon = WonderIcons.CheckCircle, tint = Color(0xFF2E9E44)) }
 
     if (editingScene) CustomSceneEditor { editingScene = false; tick++ }
-    LockPanel(WpConfig.source(context, if (WpConfig.dayNight(context)) "day" else "all"), tick) { tick++ }
+    LockPanel(WpConfig.lockSource(context), tick) { tick++ }
     choosing?.let { slot ->
         val name = when (slot) { "day" -> "daytime"; "night" -> "night"; else -> "your" }
         WonderDialog(onDismissRequest = { choosing = null }, title = { Text("Choose $name wallpaper") }, text = {
@@ -210,4 +211,40 @@ private fun copyVideo(c: Context, slot: String, u: Uri): String {
     val f = File(dir, "$slot.mp4")
     c.contentResolver.openInputStream(u)!!.use { i -> f.outputStream().use { o -> i.copyTo(o, 1 shl 16) } }
     return f.absolutePath
+}
+
+
+/** One tap to put a dynamic scene on the home screen and on the lock screen, each on its own. */
+@Composable
+private fun QuickSetup(tick: Int, changed: () -> Unit, toast: (String) -> Unit, editCustom: () -> Unit) {
+    val context = LocalContext.current
+    val p = wonderPalette()
+    val presets = listOf("theme" to "My theme", "aqua" to "Aqua", "bliss" to "Bliss", "super" to "Super", "custom" to "My own")
+    val dn = remember(tick) { WpConfig.dayNight(context) }
+    val homeSrc = remember(tick) { WpConfig.source(context, "all") }
+    val homeSel = if (dn) "daynight" else if (homeSrc.kind == "scene") homeSrc.id else "other"
+    val same = remember(tick) { WpConfig.lockSame(context) }
+    val lockSrc = remember(tick) { WpConfig.source(context, "lock") }
+    val lockSel = if (same) "same" else if (lockSrc.kind == "scene") lockSrc.id else "other"
+    val live = remember(tick) { WpConfig.liveActive(context) }
+    fun askLive() { if (!WpConfig.liveActive(context)) runCatching { context.startActivity(WpConfig.switchToLive(context)) }.onFailure { toast("This phone can't use live wallpapers") } }
+    Panel(title = "Quick setup", footer = "Dynamic scenes move with the time of day. “My theme” follows your Wonderdesk look: Aqua for Aqua, Bliss for Bliss and Dark Bliss, Super for Super. When Android asks, choose “Home screen and lock screen” so the lock screen can use it too.") {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Home screen", style = MaterialTheme.typography.labelLarge)
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                presets.forEach { (id, label) -> Chip(label, homeSel == id, {
+                    WpConfig.setDayNight(context, false); WpConfig.setSource(context, "all", Source("scene", id)); DayNight.takeOver(context); askLive(); changed(); if (id == "custom") editCustom()
+                }) }
+                Chip("Day and night", homeSel == "daynight", { WpConfig.setDayNight(context, true); DayNight.takeOver(context); changed() })
+            }
+            Text("Lock screen", style = MaterialTheme.typography.labelLarge)
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Chip("Same as home", lockSel == "same", { WpConfig.setLockSame(context, true); askLive(); changed() })
+                presets.forEach { (id, label) -> Chip(label, lockSel == id, {
+                    WpConfig.setLockSame(context, false); WpConfig.setSource(context, "lock", Source("scene", id)); DayNight.takeOver(context); askLive(); changed(); if (id == "custom") editCustom()
+                }) }
+            }
+            Text(if (live) "Animated wallpaper is on." else "Turn the animated wallpaper on when Android asks, then pick “Home screen and lock screen”.", style = MaterialTheme.typography.bodySmall, color = p.secondaryText)
+        }
+    }
 }

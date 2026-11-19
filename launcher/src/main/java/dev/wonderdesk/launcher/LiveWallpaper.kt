@@ -78,6 +78,11 @@ object WpConfig {
         return when (slot) { "night" -> Source.NIGHT; "all" -> Source("scene", "theme"); else -> Source.DAY }
     }
 
+    /** The lock screen can show its own look; by default it matches the home screen. */
+    fun lockSame(c: Context) = prefs(c).getBoolean("lockSame", true)
+    fun setLockSame(c: Context, v: Boolean) { prefs(c).edit().putBoolean("lockSame", v).apply(); changed(c) }
+    fun lockSource(c: Context): Source = if (lockSame(c)) current(c) else source(c, "lock").let { if (prefs(c).getString("src_lock", null) == null) Source("scene", "theme") else it }
+
     fun setSource(c: Context, slot: String, s: Source) { prefs(c).edit().putString("src_$slot", s.toJson().toString()).apply(); changed(c) }
 
     /** The slot showing right now. */
@@ -236,6 +241,7 @@ class WonderdeskWallpaper : WallpaperService() {
         private var sceneCfg = SceneConfig()
         private var lockLook = LockLook()
         private var isLock = false
+        private var lockedNow = false
         private var battery = 100
         private var charging = false
         private var batteryAt = 0L
@@ -287,7 +293,8 @@ class WonderdeskWallpaper : WallpaperService() {
         /** Chooses what to show for the time of day and sets it up, only when it changed. */
         private fun reselect() {
             if (w == 0 || h == 0) return
-            var want = WpConfig.current(this@WonderdeskWallpaper)
+            lockedNow = runCatching { getSystemService(android.app.KeyguardManager::class.java)?.isKeyguardLocked == true }.getOrDefault(false)
+            var want = if (lockedNow) WpConfig.lockSource(this@WonderdeskWallpaper) else WpConfig.current(this@WonderdeskWallpaper)
             // A video that has gone missing falls back to the bubbles instead of a blank screen.
             if (want.kind == "video" && want.files.firstOrNull()?.let { File(it).isFile } != true) want = Source.DAY
             if (src?.signature == want.signature) return
@@ -342,6 +349,9 @@ class WonderdeskWallpaper : WallpaperService() {
             val holder = surfaceHolder
             val s = src ?: return
             val now = System.nanoTime(); val dt = ((now - last) / 1e9f).coerceIn(0f, .1f); last = now
+            // Locking or unlocking the phone can switch the look.
+            val lockedPeek = runCatching { getSystemService(android.app.KeyguardManager::class.java)?.isKeyguardLocked == true }.getOrDefault(false)
+            if (lockedPeek != lockedNow && !WpConfig.lockSame(this@WonderdeskWallpaper)) { src = null; reselect(); return }
             if (s.kind == "video") return   // the player owns the surface
             if (s.kind == "photos" && photos.size > 1) advanceSlideshow(dt)
             field?.step(dt)
