@@ -1,5 +1,9 @@
 # Launcher changelog
 
+## v0.5.32
+
+- Fixed the lock screen showing two clocks: Android's own clock can't be removed, so the Launcher no longer draws a second one. It is now an option (Add my own clock and info), off by default
+
 ## v0.5.31
 
 - Wallpaper scenes rebuilt so they look polished and run smoothly. Bliss is a soft green hill with real clouds and light rolling over the grass, Super is glowing nebulae, twinkling stars and rings of light, and Aqua has swaying light shafts, rippling caustics and drifting specks

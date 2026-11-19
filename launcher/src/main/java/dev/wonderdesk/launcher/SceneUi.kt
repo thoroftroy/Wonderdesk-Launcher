@@ -72,7 +72,10 @@ fun LockPanel(source: Source, tick: Int, onChange: () -> Unit) {
     fun update(n: LockLook) { look = n; LockLook.save(context, n); onChange() }
     val base by produceState<Bitmap?>(null, source.signature, tick) { value = withContext(Dispatchers.Default) { runCatching { WpConfig.staticBitmap(context, source, 360, 640) }.getOrNull() } }
     val preview = remember(base, look) { base?.let { lockPreview(context, it, look) } }
-    Panel(title = "Lock screen", footer = "Android keeps its own small clock at the top of the lock screen, so this layout sits below it. Shows on the lock screen when Wonderdesk's animated wallpaper is chosen for it (pick “Home screen and lock screen” when Android asks).") {
+    Panel(title = "Lock screen", footer = "Android always shows its own clock on the lock screen and apps can't remove it, so nothing extra is drawn unless you turn this on. When on, this layout sits below Android's clock and only shows on the lock screen when Wonderdesk's animated wallpaper is chosen for it.") {
+        SwitchRow("Add my own clock and info", look.show, { update(look.copy(show = it)) }, subtitle = "Off: only Android's own lock screen clock shows", icon = WonderIcons.Schedule, tint = Color(0xFF1E7FE8))
+        if (look.show) {
+        PanelDivider()
         Row(Modifier.padding(14.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             Box(Modifier.width(104.dp).aspectRatio(9f / 16f).clip(RoundedCornerShape(12.dp)).background(p.window).border(1.dp, p.panelBorder, RoundedCornerShape(12.dp))) {
                 preview?.let { Image(it.asImageBitmap(), "Lock screen preview", Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
@@ -90,6 +93,7 @@ fun LockPanel(source: Source, tick: Int, onChange: () -> Unit) {
         SwitchRow("Battery level", look.battery, { update(look.copy(battery = it)) }, icon = WonderIcons.Bolt, tint = Color(0xFF2E9E44))
         PanelDivider()
         SwitchRow("Next alarm", look.alarm, { update(look.copy(alarm = it)) }, icon = WonderIcons.Notifications, tint = Color(0xFFE39A12))
+        }
     }
 }
 

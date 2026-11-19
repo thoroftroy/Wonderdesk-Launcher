@@ -406,11 +406,11 @@ class WonderdeskWallpaper : WallpaperService() {
  * Lock screen look: a clock layout drawn on the wallpaper when it is the lock screen's.
  * ================================================================================================== */
 
-data class LockLook(val layout: String = "center", val style: String = "thin", val date: Boolean = true, val battery: Boolean = true, val alarm: Boolean = true) {
+data class LockLook(val layout: String = "center", val style: String = "thin", val date: Boolean = true, val battery: Boolean = true, val alarm: Boolean = true, val show: Boolean = false) {
     companion object {
         private fun prefs(c: Context) = c.getSharedPreferences("lock", Context.MODE_PRIVATE)
-        fun load(c: Context) = LockLook(prefs(c).getString("layout", "center")!!, prefs(c).getString("style", "thin")!!, prefs(c).getBoolean("date", true), prefs(c).getBoolean("battery", true), prefs(c).getBoolean("alarm", true))
-        fun save(c: Context, l: LockLook) { prefs(c).edit().putString("layout", l.layout).putString("style", l.style).putBoolean("date", l.date).putBoolean("battery", l.battery).putBoolean("alarm", l.alarm).apply(); c.sendBroadcast(Intent(WpConfig.ACTION_RELOAD).setPackage(c.packageName)) }
+        fun load(c: Context) = LockLook(prefs(c).getString("layout", "center")!!, prefs(c).getString("style", "thin")!!, prefs(c).getBoolean("date", true), prefs(c).getBoolean("battery", true), prefs(c).getBoolean("alarm", true), prefs(c).getBoolean("show", false))
+        fun save(c: Context, l: LockLook) { prefs(c).edit().putString("layout", l.layout).putString("style", l.style).putBoolean("date", l.date).putBoolean("battery", l.battery).putBoolean("alarm", l.alarm).putBoolean("show", l.show).apply(); c.sendBroadcast(Intent(WpConfig.ACTION_RELOAD).setPackage(c.packageName)) }
         val LAYOUTS = listOf("center" to "Centered", "left" to "Left stack", "bottom" to "Low and large", "minimal" to "Minimal")
         val STYLES = listOf("thin" to "Thin", "bold" to "Bold", "mono" to "Mono")
     }
@@ -419,6 +419,8 @@ data class LockLook(val layout: String = "center", val style: String = "thin", v
 object LockDraw {
     /** The clock, date and small facts, drawn over whatever the wallpaper shows. Also used for the preview. */
     fun draw(c: Canvas, ctx: Context, w: Int, h: Int, look: LockLook) {
+        // Android always draws its own clock on the lock screen and apps cannot hide it, so ours is off unless asked for.
+        if (!look.show) return
         val now = java.time.LocalTime.now()
         val is24 = android.text.format.DateFormat.is24HourFormat(ctx)
         val time = if (is24) "%02d:%02d".format(now.hour, now.minute) else "%d:%02d".format(if (now.hour % 12 == 0) 12 else now.hour % 12, now.minute)
