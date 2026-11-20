@@ -23,6 +23,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -159,4 +161,45 @@ private fun RuleDialog(onDismiss: () -> Unit, onAdd: (Rule) -> Unit) {
             Text("Shift the colours by $hue°", style = MaterialTheme.typography.labelMedium); Slider(hue.toFloat(), { hue = it.toInt() }, valueRange = 0f..350f)
         }
     }, confirmButton = { TextButton(onClick = { onAdd(Rule(kind, a, b, base, hue)) }) { Text("Add") } }, dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } })
+}
+
+/** A scene full screen and live, with a slider to see it at any hour. Tap the scene to interact. */
+@Composable
+fun ScenePreview(id: String, onClose: () -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var hour by androidx.compose.runtime.remember { androidx.compose.runtime.mutableFloatStateOf(-1f) }
+    val base = androidx.compose.runtime.remember(id) { SceneConfig.resolve(context, id) }
+    val cfg = androidx.compose.runtime.remember(base, hour) { base.copy(fixedHour = hour) }
+    androidx.compose.ui.window.Dialog(onDismissRequest = onClose, properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+        androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black)) {
+            androidx.compose.foundation.layout.BoxWithConstraints(androidx.compose.ui.Modifier.fillMaxSize()) {
+                val ratio = (constraints.maxWidth.toFloat() / constraints.maxHeight.coerceAtLeast(1)).coerceIn(.3f, 3f)
+                val h = 900; val w = (h * ratio).toInt().coerceAtLeast(200)
+                val bmp = androidx.compose.runtime.remember(w) { Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888) }
+                val canvas = androidx.compose.runtime.remember(bmp) { android.graphics.Canvas(bmp) }
+                val runner = androidx.compose.runtime.remember(bmp, id) { SceneRunner(w, h) }
+                var frame by androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(0) }
+                androidx.compose.runtime.LaunchedEffect(runner) {
+                    var last = 0L
+                    while (true) androidx.compose.runtime.withFrameNanos { t ->
+                        if (last == 0L) last = t
+                        val dt = ((t - last) / 1e9f).coerceAtMost(.1f)
+                        if (dt >= 1f / 30f) { runner.update(dt, cfg, 100, false); runner.draw(canvas, cfg); last = t; frame++ }
+                    }
+                }
+                androidx.compose.foundation.Canvas(androidx.compose.ui.Modifier.fillMaxSize().pointerInput(runner) {
+                    detectTapGestures { o -> runner.tap(o.x / size.width * w, o.y / size.height * h, cfg) }
+                }) { frame; drawImage(bmp.asImageBitmap(), dstSize = androidx.compose.ui.unit.IntSize(size.width.toInt(), size.height.toInt()), filterQuality = androidx.compose.ui.graphics.FilterQuality.Medium) }
+            }
+            androidx.compose.foundation.layout.Column(androidx.compose.ui.Modifier.align(androidx.compose.ui.Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding().padding(16.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(18.dp)).background(androidx.compose.ui.graphics.Color(0x99000000)).padding(12.dp)) {
+                androidx.compose.material3.Text(if (hour < 0) "Time of day: now" else "Time of day: " + Sun.label(hour), color = androidx.compose.ui.graphics.Color.White, style = androidx.compose.material3.MaterialTheme.typography.labelLarge)
+                androidx.compose.material3.Slider(if (hour < 0) java.time.LocalTime.now().let { it.hour + it.minute / 60f } else hour, { hour = it }, valueRange = 0f..24f)
+                Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
+                    androidx.compose.material3.TextButton(onClick = { hour = -1f }) { androidx.compose.material3.Text("Now") }
+                    androidx.compose.foundation.layout.Spacer(androidx.compose.ui.Modifier.weight(1f))
+                    androidx.compose.material3.TextButton(onClick = onClose) { androidx.compose.material3.Text("Close") }
+                }
+            }
+        }
+    }
 }

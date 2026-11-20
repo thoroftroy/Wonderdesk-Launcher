@@ -253,6 +253,12 @@ private fun QuickSetup(tick: Int, changed: () -> Unit, toast: (String) -> Unit, 
             SceneTiles(presets, homeSel) { id ->
                 WpConfig.setDayNight(context, false); WpConfig.setSource(context, "all", Source("scene", id)); make(false); if (id == "custom") editCustom()
             }
+            var previewing by remember { mutableStateOf<String?>(null) }
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("Preview full screen", style = MaterialTheme.typography.labelMedium, color = p.secondaryText)
+                listOf("aqua" to "Aqua", "bliss" to "Bliss", "super" to "Super").forEach { (id, label) -> Chip(label, false, { previewing = id }) }
+            }
+            previewing?.let { ScenePreview(it) { previewing = null } }
             HorizontalDivider()
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Lock screen", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))

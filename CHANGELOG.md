@@ -1,5 +1,12 @@
 # Launcher changelog
 
+## v0.7.0
+
+- Bliss and Super wallpapers redrawn from scratch. Bliss: rolling hills fading into haze, thousands of grass blades that sway in a wind wave you can see cross the field, soft layered clouds, a glowing sun, birds and the odd rainbow. Super: a real layered nebula that drifts and shifts colour, stars at three depths with a few that sparkle, flowing rainbow aurora and a ringed planet
+- Preview any scene full screen with a time of day slider (Wallpaper settings, Preview full screen)
+- Floating button rebuilt: it matches your Wonderdesk look, opens with a springy animation, shows each app's real icon, and can sit anywhere (snapping is now optional). Hide it from its own menu, a long-press, the Floating button Quick Settings tile or the Wonderdesk icon's long-press shortcut. It draws nothing while the screen is being recorded so it is never in a recording, yet a tap in the same spot still opens the menu. With Cinema 0.5.22 it offers Record, Stop, Start clip and Save clip. New shortcuts: volume, split screen, new note, new event, search, and every Wonderdesk app. Choose a tap, double tap and long press action, colour, size and opacity
+- The menu bar preview no longer squishes the bar, and the camera hole shows as a black dot so it can be lined up exactly
+
 ## v0.6.0
 
 - Animated wallpapers follow the real sun: sunrise and sunset come from your location and the time of year (Wallpaper settings, Real sunrise and sunset). Without location it estimates from your time zone
