@@ -93,6 +93,8 @@ object AssistActions {
             AssistAct("rec", "Record", WonderIcons.Videocam, "Recording"), AssistAct("clip", "Clip", WonderIcons.ContentCut, "Recording"),
             AssistAct("newnote", "New note", WonderIcons.NoteAdd, "Quick"), AssistAct("newevent", "New event", WonderIcons.Event, "Quick"), AssistAct("search", "Search", WonderIcons.Search, "Quick"),
             AssistAct("hide", "Hide", WonderIcons.VisibilityOff, "Quick"),
+            AssistAct("ripplenote", "Ripple note", WonderIcons.NoteAdd, "Ripple"), AssistAct("ripplenotes", "Notepads", WonderIcons.Notes, "Ripple"),
+            AssistAct("ripplefiles", "Files", WonderIcons.Folder, "Ripple"), AssistAct("ripplewake", "Wake PC", WonderIcons.Bolt, "Ripple"),
         ) + APPS.map { (n, p) -> AssistAct("app:$p", n, null, "Apps", p) }
     }
     fun byId(id: String) = CATALOG.firstOrNull { it.id == id }
@@ -108,12 +110,15 @@ object AssistActions {
     fun size(c: Context) = prefs(c).getInt("size", 52)
     fun opacity(c: Context) = prefs(c).getInt("opacity", 85)
     fun snap(c: Context) = prefs(c).getBoolean("snap", false)
-    fun hideWhileRecording(c: Context) = prefs(c).getBoolean("hideRec", true)
+    /** Off by default: Android has no way to leave one overlay out of a recording, so hiding it only means you cannot see your own Clip button. A new key, so an old saved choice does not carry over. */
+    fun hideWhileRecording(c: Context) = prefs(c).getBoolean("hideRec2", false)
     fun accentId(c: Context) = prefs(c).getString("accent", "look") ?: "look"
     fun gesture(c: Context, k: String) = prefs(c).getString("g_$k", when (k) { "tap" -> "menu"; "long" -> "hide"; else -> "none" }) ?: "none"
     fun set(c: Context, key: String, v: Any) { prefs(c).edit().apply { when (v) { is Boolean -> putBoolean(key, v); is Int -> putInt(key, v); is String -> putString(key, v) } }.apply(); LockService.instance?.refreshButton() }
     /** Start recording in clip mode (a silent rolling buffer you save from, never a long file you forgot about). */
     fun recClip(c: Context) = prefs(c).getBoolean("recClip", true)
+    /** What New note makes: a Scribble note, or a Ripple note that is kept in sync with a computer. */
+    fun noteTarget(c: Context) = prefs(c).getString("noteTarget", "scribble") ?: "scribble"
     fun chosen(c: Context): List<String> {
         // The menu changed a lot (Home and Back went, Record leads). Everyone starts from the new default once, so an old saved list can
         // never leave it without Record or empty; after that your own choices are kept.
@@ -136,6 +141,11 @@ object AssistActions {
             "clip" -> if (!AssistState.recording || !AssistState.clipMode) null else if (AssistState.writing) a.copy(label = "Save clip") else a.copy(label = "Start clip")
             else -> a
         }
+    }
+
+    /** One tap makes a new note in a Ripple notepad (kept in sync with your computer) and opens it in Scribble. */
+    private fun quickRippleNote(s: Context) {
+        runCatching { s.startActivity(Intent().setClassName("dev.wonderdesk.ripple", "dev.wonderdesk.ripple.QuickNoteActivity").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION)) }
     }
 
     private fun toCinema(s: AccessibilityService, action: String) { s.sendBroadcast(Intent(action).setPackage("dev.wonderdesk.cinema"), "dev.wonderdesk.cinema.CONTROL") }
@@ -168,7 +178,11 @@ object AssistActions {
                 runCatching { s.startActivity(Intent().setClassName("dev.wonderdesk.cinema", "dev.wonderdesk.cinema.RecordActivity").putExtra("clip", recClip(s)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION)) }
             }
             id == "clip" -> if (AssistState.writing) toCinema(s, RecorderBridge.SAVE_CLIP) else toCinema(s, RecorderBridge.CLIP)
-            id == "newnote" -> openApp(s, "dev.wonderdesk.scribble") { putExtra("new", true) }
+            id == "newnote" -> if (noteTarget(s) == "ripple") quickRippleNote(s) else openApp(s, "dev.wonderdesk.scribble") { putExtra("new", true) }
+            id == "ripplenote" -> quickRippleNote(s)
+            id == "ripplenotes" -> openApp(s, "dev.wonderdesk.ripple") { putExtra("open", "notepads") }
+            id == "ripplefiles" -> openApp(s, "dev.wonderdesk.ripple") { putExtra("open", "files") }
+            id == "ripplewake" -> runCatching { s.sendBroadcast(Intent("dev.wonderdesk.ripple.CMD_WAKE").setPackage("dev.wonderdesk.ripple"), "dev.wonderdesk.ripple.QUICK") }
             id == "newevent" -> openApp(s, "dev.wonderdesk.chronicle") { putExtra("new", true) }
             id == "search" -> openApp(s, "dev.wonderdesk.beacon") { putExtra("search", true) }
             id == "hide" -> { AssistState.hidden = true; LockService.instance?.refreshButton() }
@@ -242,6 +256,8 @@ class FloatingButton(private val s: AccessibilityService) {
         val v = compose { ButtonBody(p) }
         runCatching { wm.addView(v, p) }.onSuccess { buttonView = v }
         addPanel()
+        // Ripple's cards (computer on or asleep, terminals) are posted by Ripple; ask for them now.
+        runCatching { s.sendBroadcast(Intent("dev.wonderdesk.assist.REFRESH").setPackage("dev.wonderdesk.ripple")) }
     }
 
     /** Recording state comes from Cinema; the button hides itself from the recording while it runs. */
@@ -334,7 +350,7 @@ class FloatingButton(private val s: AccessibilityService) {
         val panelW = cell * cols + 20.dp
         val density = dm.density
         val rows = (acts.size + cols - 1) / cols
-        val cardsH = AssistCards.list.sumOf { (52 + (if (it.progress in 0..100) 10 else 0) + (if (it.actions.isNotEmpty()) 34 else 0) + 6) }.dp
+        val cardsH = AssistCards.list.sumOf { (52 + 14 * ((it.text?.count { ch -> ch == '\n' } ?: 0)) + (if (it.progress in 0..100) 10 else 0) + (if (it.actions.isNotEmpty()) 34 else 0) + 6) }.dp
         val panelH = 46.dp + (cell + 4.dp) * rows + 14.dp + cardsH
         val panelWpx = panelW.value * density; val panelHpx = panelH.value * density
         val cx = bx + bw / 2f

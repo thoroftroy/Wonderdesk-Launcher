@@ -1,5 +1,13 @@
 # Launcher changelog
 
+## v0.9.0
+
+- Ripple shortcuts: New note can make a Ripple note (kept in sync with your computer) instead of a Scribble note (floating button settings, New note makes), plus Ripple note, Notepads, Files and Wake PC as shortcuts of their own. Ripple's computer and terminal status cards show at the top of the menu
+
+## v0.8.2
+
+- The floating button now stays on screen and usable while recording, so Start clip, Save clip and Stop are always one tap away (Android cannot leave a single overlay out of a recording, so it will be in the video). The old behaviour of hiding it is still there as a setting, off by default
+
 ## v0.8.1
 
 - Fixed the floating button's menu coming up empty or without Record: everyone's menu starts from the new default once (Record, Screenshot, New note, Search, Beacon, Alerts, Lock, Hide), an empty list can no longer happen, and an empty menu now has a Restore the default menu button (also in settings)

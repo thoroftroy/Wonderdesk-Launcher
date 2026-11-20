@@ -76,7 +76,7 @@ fun AssistCardsSection(accent: Color, close: () -> Unit) {
                     if (art != null) Image(art, null, Modifier.size(26.dp).clip(CircleShape))
                     Column(Modifier.weight(1f).padding(horizontal = 8.dp)) {
                         Text(card.title, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold), color = pal.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        if (!card.text.isNullOrBlank()) Text(card.text, style = MaterialTheme.typography.bodySmall, color = pal.secondaryText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        if (!card.text.isNullOrBlank()) Text(card.text, style = MaterialTheme.typography.bodySmall, color = pal.secondaryText, maxLines = 4, overflow = TextOverflow.Ellipsis)
                     }
                 }
                 if (card.progress in 0..100) LinearProgressIndicator(progress = { card.progress / 100f }, Modifier.fillMaxWidth().padding(top = 6.dp).height(4.dp).clip(CircleShape), color = accent)

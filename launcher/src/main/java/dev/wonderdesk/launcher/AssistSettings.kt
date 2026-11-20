@@ -65,10 +65,20 @@ fun AssistSettingsPanel(needAccess: () -> Unit) {
             PanelDivider()
             SwitchRow("Snap to the screen edge", snap, { snap = it; AssistActions.set(context, "snap", it) }, subtitle = "Off: it stays exactly where you drop it", icon = WonderIcons.Gesture, tint = Color(0xFF8E44AD))
             PanelDivider()
+            var noteTarget by remember { mutableStateOf(AssistActions.noteTarget(context)) }
+            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("New note makes", style = MaterialTheme.typography.titleSmall)
+                Text("A Ripple note is saved in a Ripple notepad and kept in sync with your computer, so it is waiting there when you get to it. You can also add Ripple note, Notepads, Files and Wake PC as their own shortcuts below.", style = MaterialTheme.typography.bodySmall, color = p.secondaryText)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Chip("A Scribble note", noteTarget == "scribble", { noteTarget = "scribble"; AssistActions.set(context, "noteTarget", "scribble") })
+                    Chip("A Ripple note", noteTarget == "ripple", { noteTarget = "ripple"; AssistActions.set(context, "noteTarget", "ripple") })
+                }
+            }
+            PanelDivider()
             var recClip by remember { mutableStateOf(AssistActions.recClip(context)) }
             SwitchRow("Record starts in clip mode", recClip, { recClip = it; AssistActions.set(context, "recClip", it) }, subtitle = "Tapping Record starts Cinema straight away with no prompts, silently keeping the last few seconds. Start a clip, save it or stop from the button's menu. Off: a normal full recording", icon = WonderIcons.Videocam, tint = Color(0xFFE5483C))
             PanelDivider()
-            SwitchRow("Hide while recording", hideRec, { hideRec = it; AssistActions.set(context, "hideRec", it) }, subtitle = "Draws nothing during a screen recording or clip mode, so it can't be in the video. A tap in the same spot still opens the menu, with Stop and Clip", icon = WonderIcons.Videocam, tint = Color(0xFFE5483C))
+            SwitchRow("Hide while recording", hideRec, { hideRec = it; AssistActions.set(context, "hideRec2", it) }, subtitle = "Off: the button stays on screen and usable while recording, so you can start and save clips, but it will be in the video. On: it draws nothing while recording (a tap in the same spot still opens the menu)", icon = WonderIcons.Videocam, tint = Color(0xFFE5483C))
             PanelDivider()
             var cards by remember { mutableStateOf(AssistCards.enabled(context)) }
             SwitchRow("Show app controls", cards, { cards = it; AssistCards.setEnabled(context, it); if (!it) AssistCards.list.clear() }, subtitle = "Apps that have a control notification (Bliss Player's playback, Wayfinder's sharing and file jobs, Ripple's connection, Cinema's recording) also put it at the top of this menu. Their notifications stay as they are, so nothing changes for anyone not using the button. Choose per app in Control Room", icon = WonderIcons.Notifications, tint = Color(0xFFE5483C))
@@ -82,7 +92,7 @@ fun AssistSettingsPanel(needAccess: () -> Unit) {
                 Text("Shortcuts in its menu (${chosen.size})", style = MaterialTheme.typography.titleSmall)
                 Text("Restore the default shortcuts", Modifier.clip(RoundedCornerShape(16.dp)).background(p.accent.copy(alpha = .14f)).clickable { AssistActions.resetChosen(context); chosen = AssistActions.chosen(context) }.padding(horizontal = 12.dp, vertical = 6.dp), style = MaterialTheme.typography.labelLarge, color = p.accent)
                 Text("Pick what the menu holds. Recording shortcuts change with what the recorder is doing: Record becomes Stop, Clip appears in clip mode.", style = MaterialTheme.typography.bodySmall, color = p.secondaryText)
-                listOf("System", "Recording", "Quick", "Apps").forEach { group ->
+                listOf("System", "Recording", "Quick", "Ripple", "Apps").forEach { group ->
                     Text(group, style = MaterialTheme.typography.labelLarge, color = p.accent)
                     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         AssistActions.CATALOG.filter { it.group == group }.forEach { a -> Chip(a.label, a.id in chosen, { chosen = if (a.id in chosen) chosen - a.id else chosen + a.id; AssistActions.setChosen(context, chosen) }) }
