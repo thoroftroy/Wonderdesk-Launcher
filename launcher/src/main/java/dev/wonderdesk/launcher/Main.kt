@@ -158,6 +158,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume(); resumed = true
         Home.refreshIfChanged(this)
+        Sun.refresh(this)
         applyRotation()
         if (Home.settings.askDefault && !isDefaultHome()) welcome.value = true
         // A fresh install starts with Wonderdesk's Aqua wallpaper (bubbles by day, deep water at night).
@@ -181,10 +182,16 @@ class MainActivity : ComponentActivity() {
 
 /** Optional: lets the launcher lock the screen with a gesture. */
 class LockService : AccessibilityService() {
-    override fun onServiceConnected() { instance = this }
+    private var floating: FloatingButton? = null
+    override fun onServiceConnected() { instance = this; refreshButton() }
+    /** Shows or hides the floating assist button to match its setting. */
+    fun refreshButton() {
+        floating?.hide(); floating = null
+        if (AssistActions.enabled(this)) floating = FloatingButton(this).also { it.show() }
+    }
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {}
     override fun onInterrupt() {}
-    override fun onDestroy() { instance = null; super.onDestroy() }
+    override fun onDestroy() { floating?.hide(); instance = null; super.onDestroy() }
     companion object { var instance: LockService? = null }
 }
 
@@ -744,13 +751,37 @@ private fun MenuBar(onApps: () -> Unit, onSearch: () -> Unit, onSettings: () -> 
         val scale = st.barText / 100f
         // A camera hole at the top makes the bar at least as tall as the hole and keeps its buttons clear of corner cutouts.
         val cutTop = with(androidx.compose.ui.platform.LocalDensity.current) { WindowInsets.displayCutout.getTop(this).toDp() }
+        val holeOn = st.holeW > 0
         Row(Modifier.fillMaxWidth().height(maxOf(st.barHeight.dp, cutTop)).windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Horizontal)).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            // With a camera hole placed by hand, the left pieces and the right pieces sit on either side of it.
+            if (holeOn) Row(Modifier.weight(st.holeX.coerceIn(5, 95).toFloat()), verticalAlignment = Alignment.CenterVertically) {
             Box {
                 val art = remember { context.appArt(64) }
                 Row(Modifier.clip(RoundedCornerShape(4.dp)).clickable { orb = true }.padding(horizontal = (4 * scale).dp, vertical = (3 * scale).dp), verticalAlignment = Alignment.CenterVertically) {
                     art?.let { Image(it, "Wonderdesk menu", Modifier.size((20 * scale).dp)) }
-                    Spacer(Modifier.width((6 * scale).dp))
-                    Text("Wonderdesk", style = TextStyle(fontWeight = FontWeight.Bold, fontSize = 14.sp * scale, color = ink), maxLines = 1)
+                    if (st.barName) Spacer(Modifier.width((6 * scale).dp))
+                    if (st.barName) Text("Wonderdesk", style = TextStyle(fontWeight = FontWeight.Bold, fontSize = 14.sp * scale, color = ink), maxLines = 1)
+                }
+                DropdownMenu(orb, { orb = false }, Modifier.background(pal.panel)) {
+                    DropdownMenuItem({ Text("All apps (Beacon)") }, { orb = false; onApps() }, leadingIcon = { Icon(WonderIcons.Apps, null) })
+                    DropdownMenuItem({ Text("Add a widget…") }, { orb = false; onWidgets() }, leadingIcon = { Icon(WonderIcons.Widgets, null) })
+                    DropdownMenuItem({ Text("Desktop & wallpaper…") }, { orb = false; onWallpaper() }, leadingIcon = { Icon(WonderIcons.Wallpaper, null) })
+                    // Quick switcher between saved looks (wallpapers and lock screen together).
+                    Looks.names(context).take(6).forEach { n -> DropdownMenuItem({ Text("Look: $n") }, { orb = false; Looks.apply(context, n) }, leadingIcon = { Icon(WonderIcons.Palette, null) }) }
+                    HorizontalDivider()
+                    DropdownMenuItem({ Text("Control Room") }, { orb = false; context.openPackageOr("dev.wonderdesk.controlroom", Intent(AndroidSettings.ACTION_SETTINGS)) }, leadingIcon = { Icon(WonderIcons.Tune, null) })
+                    DropdownMenuItem({ Text("Wonderdesk Apphub") }, { orb = false; context.openPackageOr("dev.wonderdesk.apphub", Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/thoroftroy/App-Hub/releases"))) }, leadingIcon = { Icon(WonderIcons.SystemUpdate, null) })
+                    DropdownMenuItem({ Text("Home screen settings") }, { orb = false; onSettings() }, leadingIcon = { Icon(WonderIcons.Settings, null) })
+                }
+            }
+            }
+            else {
+            Box {
+                val art = remember { context.appArt(64) }
+                Row(Modifier.clip(RoundedCornerShape(4.dp)).clickable { orb = true }.padding(horizontal = (4 * scale).dp, vertical = (3 * scale).dp), verticalAlignment = Alignment.CenterVertically) {
+                    art?.let { Image(it, "Wonderdesk menu", Modifier.size((20 * scale).dp)) }
+                    if (st.barName) Spacer(Modifier.width((6 * scale).dp))
+                    if (st.barName) Text("Wonderdesk", style = TextStyle(fontWeight = FontWeight.Bold, fontSize = 14.sp * scale, color = ink), maxLines = 1)
                 }
                 DropdownMenu(orb, { orb = false }, Modifier.background(pal.panel)) {
                     DropdownMenuItem({ Text("All apps (Beacon)") }, { orb = false; onApps() }, leadingIcon = { Icon(WonderIcons.Apps, null) })
@@ -763,6 +794,25 @@ private fun MenuBar(onApps: () -> Unit, onSearch: () -> Unit, onSettings: () -> 
                 }
             }
             Spacer(Modifier.weight(1f))
+            }
+            if (holeOn) Spacer(Modifier.width(st.holeW.dp))
+            if (holeOn) Row(Modifier.weight((100 - st.holeX.coerceIn(5, 95)).toFloat()), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+            if (st.barSearch) Icon(WonderIcons.Search, "Search", Modifier.clip(CircleShape).clickable(onClick = onSearch).padding((6 * scale).dp).size((20 * scale).dp), tint = pal.toolbarIcon)
+            // Date opens Chronicle, time opens Timepiece.
+            if (st.barDate) Text(now.format(DateTimeFormatter.ofPattern(if (st.barBattery) "EEE d" else "EEE d MMM")), Modifier.clip(RoundedCornerShape(4.dp)).clickable {
+                context.openPackageOr("dev.wonderdesk.chronicle", Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_CALENDAR))
+            }.padding((6 * scale).dp, (4 * scale).dp), style = TextStyle(fontSize = 14.sp * scale, color = ink, fontWeight = FontWeight.Medium), maxLines = 1)
+            if (st.barTime) Text(now.format(DateTimeFormatter.ofPattern(if (is24) "HH:mm" else if (st.barBattery) "h:mm" else "h:mm a")), Modifier.clip(RoundedCornerShape(4.dp)).clickable {
+                context.openPackageOr("dev.wonderdesk.timepiece", Intent(android.provider.AlarmClock.ACTION_SHOW_ALARMS))
+            }.padding((6 * scale).dp, (4 * scale).dp), style = TextStyle(fontSize = 14.sp * scale, color = ink, fontWeight = FontWeight.SemiBold), maxLines = 1)
+            if (st.barBattery) {
+                val level = remember(nowMs) { context.registerReceiver(null, android.content.IntentFilter(Intent.ACTION_BATTERY_CHANGED))?.let { it.getIntExtra("level", -1) * 100 / it.getIntExtra("scale", 100).coerceAtLeast(1) } ?: -1 }
+                val plugged = remember(nowMs) { (context.registerReceiver(null, android.content.IntentFilter(Intent.ACTION_BATTERY_CHANGED))?.getIntExtra("plugged", 0) ?: 0) != 0 }
+                if (level >= 0 && plugged) Icon(WonderIcons.BatteryChargingFull, null, Modifier.size((16 * scale).dp), tint = ink)
+                if (level >= 0) Text("$level%", Modifier.padding((6 * scale).dp, (4 * scale).dp), style = TextStyle(fontSize = 14.sp * scale, color = ink, fontWeight = FontWeight.Medium), maxLines = 1)
+            }
+            }
+            else Row(verticalAlignment = Alignment.CenterVertically) {
             if (st.barSearch) Icon(WonderIcons.Search, "Search", Modifier.clip(CircleShape).clickable(onClick = onSearch).padding((6 * scale).dp).size((20 * scale).dp), tint = pal.toolbarIcon)
             // Date opens Chronicle, time opens Timepiece.
             if (st.barDate) Text(now.format(DateTimeFormatter.ofPattern("EEE d MMM")), Modifier.clip(RoundedCornerShape(4.dp)).clickable {
@@ -771,8 +821,64 @@ private fun MenuBar(onApps: () -> Unit, onSearch: () -> Unit, onSettings: () -> 
             if (st.barTime) Text(now.format(DateTimeFormatter.ofPattern(if (is24) "HH:mm" else "h:mm a")), Modifier.clip(RoundedCornerShape(4.dp)).clickable {
                 context.openPackageOr("dev.wonderdesk.timepiece", Intent(android.provider.AlarmClock.ACTION_SHOW_ALARMS))
             }.padding((6 * scale).dp, (4 * scale).dp), style = TextStyle(fontSize = 14.sp * scale, color = ink, fontWeight = FontWeight.SemiBold), maxLines = 1)
+            if (st.barBattery) {
+                val level = remember(nowMs) { context.registerReceiver(null, android.content.IntentFilter(Intent.ACTION_BATTERY_CHANGED))?.let { it.getIntExtra("level", -1) * 100 / it.getIntExtra("scale", 100).coerceAtLeast(1) } ?: -1 }
+                val plugged = remember(nowMs) { (context.registerReceiver(null, android.content.IntentFilter(Intent.ACTION_BATTERY_CHANGED))?.getIntExtra("plugged", 0) ?: 0) != 0 }
+                if (level >= 0) Text((if (plugged) "⚡" else "") + "$level%", Modifier.padding((6 * scale).dp, (4 * scale).dp), style = TextStyle(fontSize = 14.sp * scale, color = ink, fontWeight = FontWeight.Medium), maxLines = 1)
+            }
+            }
         }
         Box(Modifier.fillMaxWidth().height(1.dp).background(pal.toolbarLine.copy(alpha = .7f)))
+    }
+}
+
+/** Every menu bar slider and switch, shared by the settings page and the full screen preview. */
+@Composable
+private fun BarControls(s: Settings, set: (Settings) -> Unit) {
+    val context = LocalContext.current
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text("Space above the bar: ${s.topPad} dp", style = MaterialTheme.typography.titleSmall)
+        Slider(s.topPad.toFloat(), { set(s.copy(topPad = it.toInt())) }, valueRange = 0f..64f, steps = 63)
+        Text("Bar height (how much room it takes): ${s.barHeight} dp", style = MaterialTheme.typography.titleSmall)
+        Slider(s.barHeight.toFloat(), { set(s.copy(barHeight = it.toInt())) }, valueRange = 12f..72f, steps = 59)
+        Text("Space below the bar: ${s.barBottom} dp", style = MaterialTheme.typography.titleSmall)
+        Slider(s.barBottom.toFloat(), { set(s.copy(barBottom = it.toInt())) }, valueRange = 0f..32f, steps = 31)
+        Text("Text and icon size: ${s.barText}%", style = MaterialTheme.typography.titleSmall)
+        Slider(s.barText.toFloat(), { set(s.copy(barText = it.toInt())) }, valueRange = 50f..200f, steps = 29)
+        Text("Camera hole", style = MaterialTheme.typography.titleSmall)
+        Text(if (s.holeW > 0) "The bar keeps ${s.holeW} dp clear, ${s.holeX}% of the way across, so nothing hides behind the camera." else "Off. Turn it on if the camera hole covers part of the bar: set its width, then slide it into place.", style = MaterialTheme.typography.bodySmall, color = wonderPalette().secondaryText)
+        Text("Hole width: ${if (s.holeW > 0) "${s.holeW} dp" else "off"}", style = MaterialTheme.typography.titleSmall)
+        Slider(s.holeW.toFloat(), { set(s.copy(holeW = it.toInt())) }, valueRange = 0f..64f, steps = 63)
+        if (s.holeW > 0) { Text("Hole position: ${s.holeX}% from the left", style = MaterialTheme.typography.titleSmall); Slider(s.holeX.toFloat(), { set(s.copy(holeX = it.toInt())) }, valueRange = 5f..95f, steps = 89) }
+        SwitchRow("Search", s.barSearch, { set(s.copy(barSearch = it)) })
+        SwitchRow("Date", s.barDate, { set(s.copy(barDate = it)) })
+        SwitchRow("Clock", s.barTime, { set(s.copy(barTime = it)) })
+        SwitchRow("Battery level", s.barBattery, { set(s.copy(barBattery = it)) })
+        SwitchRow("Wonderdesk name", s.barName, { set(s.copy(barName = it)) }, subtitle = "Just the logo when off")
+    }
+}
+
+/** The real bar over the current wallpaper at full size, with every control under it, so changes are seen as you make them. */
+@Composable
+private fun BarPreview(s: Settings, set: (Settings) -> Unit, onClose: () -> Unit) {
+    val context = LocalContext.current
+    val bg = remember { runCatching { SceneRunner.still(SceneConfig.resolve(context, "theme"), 270, 600).asImageBitmap() }.getOrNull() }
+    androidx.compose.ui.window.Dialog(onDismissRequest = onClose, properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+        Box(Modifier.fillMaxSize().background(Color.Black)) {
+            bg?.let { Image(it, null, Modifier.fillMaxSize(), contentScale = androidx.compose.ui.layout.ContentScale.Crop) }
+            Column(Modifier.fillMaxSize()) {
+                MenuBar(onApps = {}, onSearch = {}, onSettings = {}, onWidgets = {}, onWallpaper = {})
+                // The camera hole, drawn where the bar keeps clear.
+                if (s.holeW > 0) BoxWithConstraints(Modifier.fillMaxWidth().height(0.dp)) {
+                    Box(Modifier.offset(x = maxWidth * s.holeX / 100f - (s.holeW / 2).dp, y = (-(s.barHeight / 2) - s.barBottom - 10).dp).size(s.holeW.dp).clip(CircleShape).background(Color.Black))
+                }
+                Spacer(Modifier.weight(1f))
+                Column(Modifier.fillMaxWidth().heightIn(max = 460.dp).clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp)).background(wonderPalette().window.copy(alpha = .96f)).navigationBarsPadding().padding(14.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) { Text("Menu bar", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium); TextButton(onClick = onClose) { Text("Done") } }
+                    Column(Modifier.verticalScroll(rememberScrollState())) { BarControls(s, set) }
+                }
+            }
+        }
     }
 }
 
@@ -1477,6 +1583,8 @@ private fun LauncherSettings(onClose: () -> Unit, onWallpaper: () -> Unit) {
     val context = LocalContext.current
     var s by remember { mutableStateOf(Home.settings) }
     fun set(n: Settings) { s = n; Home.settings = n; Home.save(context) }
+    var barPreview by remember { mutableStateOf(false) }
+    if (barPreview) BarPreview(s, { set(it) }, { barPreview = false })
     val export = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { u -> u?.let { runCatching { context.contentResolver.openOutputStream(it, "wt")!!.use { o -> o.write(Home.exportLayout().toByteArray()) } } } }
     val import = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { u -> u?.let { runCatching { Home.importLayout(context, context.contentResolver.openInputStream(it)!!.bufferedReader().readText()) } } }
     var hiddenOpen by remember { mutableStateOf(false) }
@@ -1520,6 +1628,23 @@ private fun LauncherSettings(onClose: () -> Unit, onWallpaper: () -> Unit) {
                 PanelDivider()
                 ListRow("Refresh icons", subtitle = "Redraw every icon now", icon = WonderIcons.Refresh, tint = Color(0xFF1E7FE8), onClick = { IconLoader.clearDisk(context); Home.reloadIcons(context) })
             }
+            Panel(title = "Floating button", footer = "A small button that floats over every app, like Assistive Touch. Drag it anywhere, tap it for shortcuts. It uses the same accessibility switch as double-tap to lock, and reads nothing on screen.") {
+                var on by remember { mutableStateOf(AssistActions.enabled(context)) }
+                var size by remember { mutableIntStateOf(AssistActions.size(context)) }
+                var opacity by remember { mutableIntStateOf(AssistActions.opacity(context)) }
+                var chosen by remember { mutableStateOf(AssistActions.chosen(context)) }
+                SwitchRow("Show the floating button", on, { v -> on = v; AssistActions.setEnabled(context, v); if (v && LockService.instance == null) lockGuide = true }, icon = WonderIcons.TouchApp, tint = Color(0xFF1E7FE8))
+                if (on) Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Size: $size dp", style = MaterialTheme.typography.titleSmall)
+                    Slider(size.toFloat(), { size = it.toInt() }, valueRange = 36f..80f, onValueChangeFinished = { AssistActions.set(context, size = size) })
+                    Text("Opacity: $opacity%", style = MaterialTheme.typography.titleSmall)
+                    Slider(opacity.toFloat(), { opacity = it.toInt() }, valueRange = 30f..100f, onValueChangeFinished = { AssistActions.set(context, opacity = opacity) })
+                    Text("Shortcuts in its menu", style = MaterialTheme.typography.titleSmall)
+                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        AssistActions.ALL.forEach { (id, label) -> Chip(label, id in chosen, { chosen = if (id in chosen) chosen - id else chosen + id; AssistActions.setChosen(context, chosen) }) }
+                    }
+                }
+            }
             Panel(title = "Layout") {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("Columns: ${s.cols}", style = MaterialTheme.typography.titleSmall); Segmented(listOf("3", "4", "5", "6"), s.cols - 3) { set(s.copy(cols = it + 3)) }
@@ -1531,14 +1656,8 @@ private fun LauncherSettings(onClose: () -> Unit, onWallpaper: () -> Unit) {
                     Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).border(1.dp, wonderPalette().panelBorder, RoundedCornerShape(12.dp))) {
                         MenuBar(onApps = {}, onSearch = {}, onSettings = {}, onWidgets = {}, onWallpaper = {})
                     }
-                    Text("Space above the bar: ${s.topPad} dp", style = MaterialTheme.typography.titleSmall)
-                    Slider(s.topPad.toFloat(), { set(s.copy(topPad = it.toInt())) }, valueRange = 0f..64f, steps = 63)
-                    Text("Bar height (how much room it takes): ${s.barHeight} dp", style = MaterialTheme.typography.titleSmall)
-                    Slider(s.barHeight.toFloat(), { set(s.copy(barHeight = it.toInt())) }, valueRange = 12f..72f, steps = 59)
-                    Text("Space below the bar: ${s.barBottom} dp", style = MaterialTheme.typography.titleSmall)
-                    Slider(s.barBottom.toFloat(), { set(s.copy(barBottom = it.toInt())) }, valueRange = 0f..32f, steps = 31)
-                    Text("Text and icon size: ${s.barText}%", style = MaterialTheme.typography.titleSmall)
-                    Slider(s.barText.toFloat(), { set(s.copy(barText = it.toInt())) }, valueRange = 50f..200f, steps = 29)
+                    WButton("Preview full screen and adjust live", { barPreview = true }, Modifier.fillMaxWidth(), icon = WonderIcons.Fullscreen)
+                    BarControls(s) { set(it) }
                 }
                 PanelDivider(0.dp)
                 SwitchRow("Allow home screen rotation", s.rotate, { set(s.copy(rotate = it)); (context as? MainActivity)?.applyRotation() }, subtitle = "Off keeps the home screen upright when you turn the phone; apps still rotate"); PanelDivider()

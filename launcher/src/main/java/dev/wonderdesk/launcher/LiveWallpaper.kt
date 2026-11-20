@@ -365,7 +365,7 @@ class WonderdeskWallpaper : WallpaperService() {
             if (s.kind == "photos" && photos.size > 1) advanceSlideshow(dt)
             field?.step(dt)
             runner?.let { r ->
-                if (System.currentTimeMillis() - batteryAt > 30_000) { batteryAt = System.currentTimeMillis(); runCatching { val b = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))!!; battery = b.getIntExtra("level", 100) * 100 / b.getIntExtra("scale", 100).coerceAtLeast(1); charging = b.getIntExtra("plugged", 0) != 0 } }
+                if (System.currentTimeMillis() - batteryAt > 30_000) { batteryAt = System.currentTimeMillis(); Sun.refresh(this@WonderdeskWallpaper); runCatching { val b = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))!!; battery = b.getIntExtra("level", 100) * 100 / b.getIntExtra("scale", 100).coerceAtLeast(1); charging = b.getIntExtra("plugged", 0) != 0 } }
                 r.update(dt, sceneCfg, battery, charging)
             }
             val c = runCatching { if (android.os.Build.VERSION.SDK_INT >= 26) holder.surface.lockHardwareCanvas() else holder.lockCanvas() }.getOrNull() ?: runCatching { holder.lockCanvas() }.getOrNull() ?: return

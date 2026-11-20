@@ -72,7 +72,7 @@ data class Settings(
     /** Soft interface sounds (see Sounds). */
     val sounds: Boolean = true,
     /** Menu bar pieces and hiding the system bars on the home screen. */
-    val barSearch: Boolean = true, val barDate: Boolean = true, val barTime: Boolean = true, val fullscreen: Boolean = false,
+    val barSearch: Boolean = false, val barDate: Boolean = true, val barTime: Boolean = true, val fullscreen: Boolean = false,
     /** Wallpaper gap above the menu bar, in dp. */
     val topPad: Int = 8,
     /** Menu bar row height, in dp. Lower this when the bar feels too thick. */
@@ -85,6 +85,8 @@ data class Settings(
     val labelPct: Int = 100,
     /** Dock icon size, in percent. */
     val dockPct: Int = 100,
+    /** Battery level in the menu bar, the Wonderdesk name, and a camera hole the bar keeps clear (width 0 = none, x = percent across). */
+    val barBattery: Boolean = true, val barName: Boolean = true, val holeX: Int = 50, val holeW: Int = 0,
 ) {
     /** What the icon renderer gets: the style plus the icon pack, if any. */
     val iconKey get() = if (iconPack.isBlank()) iconStyle else "$iconStyle|pack:$iconPack"
@@ -92,14 +94,14 @@ data class Settings(
         .put("dockLabels", dockLabels).put("menuBar", menuBar).put("pages", pages).put("swipeUp", swipeUp).put("swipeDown", swipeDown).put("doubleTap", doubleTap)
         .put("lpSort", launchpadSort).put("darkLabels", darkLabels).put("iconStyle", iconStyle).put("reflections", reflections).put("askDefault", askDefault)
         .put("infinite", infinite).put("defaultPage", defaultPage).put("lpFoldersFirst", lpFoldersFirst).put("beaconLaunchpad", beaconLaunchpad).put("rotate", rotate).put("iconPack", iconPack).put("sounds", sounds)
-        .put("barSearch", barSearch).put("barDate", barDate).put("barTime", barTime).put("fullscreen", fullscreen).put("topPad", topPad).put("barHeight", barHeight).put("barText", barText).put("barBottom", barBottom).put("labelPct", labelPct).put("dockPct", dockPct)
+        .put("barSearch", barSearch).put("barDate", barDate).put("barTime", barTime).put("fullscreen", fullscreen).put("topPad", topPad).put("barHeight", barHeight).put("barText", barText).put("barBottom", barBottom).put("labelPct", labelPct).put("dockPct", dockPct).put("barBattery", barBattery).put("barName", barName).put("holeX", holeX).put("holeW", holeW)
 
     companion object {
         fun from(o: JSONObject) = Settings(o.optInt("cols", 4), o.optInt("rows", 5), o.optDouble("iconScale", 1.0).toFloat(), o.optBoolean("labels", true), o.optBoolean("magnify", true),
             o.optBoolean("dockLabels"), o.optBoolean("menuBar", true), o.optInt("pages", 2), o.optString("swipeUp", "launchpad"), o.optString("swipeDown", "notifications"),
             o.optString("doubleTap", "none"), o.optString("lpSort", "name"), o.optBoolean("darkLabels"), o.optString("iconStyle", "natural"), o.optBoolean("reflections", true),
             o.optBoolean("askDefault", true), o.optBoolean("infinite"), o.optInt("defaultPage", 0), o.optBoolean("lpFoldersFirst", true), o.optBoolean("beaconLaunchpad", true), o.optBoolean("rotate", false), o.optString("iconPack", ""), o.optBoolean("sounds", true),
-            o.optBoolean("barSearch", true), o.optBoolean("barDate", true), o.optBoolean("barTime", true), o.optBoolean("fullscreen", false), o.optInt("topPad", 8), o.optInt("barHeight", 32), o.optInt("barText", 100), o.optInt("barBottom", 2), o.optInt("labelPct", 100), o.optInt("dockPct", 100))
+            o.optBoolean("barSearch", false), o.optBoolean("barDate", true), o.optBoolean("barTime", true), o.optBoolean("fullscreen", false), o.optInt("topPad", 8), o.optInt("barHeight", 32), o.optInt("barText", 100), o.optInt("barBottom", 2), o.optInt("labelPct", 100), o.optInt("dockPct", 100), o.optBoolean("barBattery", true), o.optBoolean("barName", true), o.optInt("holeX", 50), o.optInt("holeW", 0))
     }
 }
 
@@ -180,7 +182,7 @@ object Home {
         scope.launch {
             val changed = withContext(Dispatchers.Default) {
                 val la = c.getSystemService(LauncherApps::class.java)
-                val now = la.profiles.flatMap { u -> la.getActivityList(null, u) }.map { it.componentName.flattenToShortString() to runCatching { c.packageManager.getPackageInfo(it.componentName.packageName, 0).lastUpdateTime }.getOrDefault(0L) }.toSet()
+                val now = la.profiles.flatMap { u -> la.getActivityList(null, u) }.map { it.componentName.flattenToShortString() to runCatching { c.packageManager.getPackageInfo(it.componentName.packageName, 0).lastUpdateTime }.getOrDefault(0L) }.toSet() + ("day" to java.time.LocalDate.now().toEpochDay())
                 (now != knownStamps).also { knownStamps = now }
             }
             if (changed) loadApps(c)
@@ -204,7 +206,7 @@ object Home {
                 App(key, ai.componentName, ai.label.toString(), icon.asImageBitmap(), user, info?.firstInstallTime ?: 0L, ai.applicationInfo.category)
             }
         }.sortedBy { it.label.lowercase() }
-        knownStamps = stamps
+        knownStamps = stamps + ("day" to java.time.LocalDate.now().toEpochDay())
         IconLoader.prune(c, keep)
         return list
     }

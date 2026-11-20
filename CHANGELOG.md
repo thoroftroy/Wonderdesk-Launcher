@@ -1,5 +1,13 @@
 # Launcher changelog
 
+## v0.6.0
+
+- Animated wallpapers follow the real sun: sunrise and sunset come from your location and the time of year (Wallpaper settings, Real sunrise and sunset). Without location it estimates from your time zone
+- Menu bar: full screen preview with every slider live under it, a camera hole you place by hand so the bar keeps clear of it, a battery level (on by default), a switch for the Wonderdesk name, and search is off by default
+- Chronicle's icon shows today's real date
+- New floating assist button (Home screen settings, Floating button): a small round button over every app, like Assistive Touch. Drag it anywhere, tap for shortcuts: Home, Back, Recents, Notifications, Quick settings, Lock, Screenshot, Power menu, Cinema screen recording, Ripple, Control Room and all apps. Choose size, opacity and which shortcuts appear
+- Saved looks: keep your wallpapers and lock screen as a named look (Wallpaper settings, Saved looks) and switch between them from the Wonderdesk menu at the top of the home screen
+
 ## v0.5.32
 
 - Fixed the lock screen showing two clocks: Android's own clock can't be removed, so the Launcher no longer draws a second one. It is now an option (Add my own clock and info), off by default

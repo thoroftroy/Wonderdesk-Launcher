@@ -25,7 +25,7 @@ import java.security.MessageDigest
  *  - "tiles": every icon sits on a rounded Aqua tile (adaptive icons use their own background).
  */
 object IconLoader {
-    private const val VERSION = 5
+    private const val VERSION = 6
     private val memory = HashMap<String, Bitmap>()
 
     fun clearMemory() = synchronized(memory) { memory.clear() }
@@ -33,7 +33,7 @@ object IconLoader {
     fun clearDisk(c: Context) { File(c.cacheDir, "icons").listFiles()?.forEach { it.delete() } }
 
     fun load(c: Context, ai: LauncherActivityInfo, px: Int, style: String, updated: Long): Bitmap {
-        val key = "${ai.componentName.flattenToShortString()}|${ai.user.hashCode()}|$updated|$style|$px|$VERSION"
+        val key = "${ai.componentName.flattenToShortString()}|${ai.user.hashCode()}|$updated|$style|$px|$VERSION|${dayStamp(ai.componentName.packageName)}"
         synchronized(memory) { memory[key]?.let { return it } }
         val file = File(File(c.cacheDir, "icons").apply { mkdirs() }, sha1(key) + ".png")
         val cached = if (file.isFile) runCatching { android.graphics.BitmapFactory.decodeFile(file.path) }.getOrNull() else null
@@ -50,7 +50,26 @@ object IconLoader {
     }
 
     fun fileKey(ai: LauncherActivityInfo, px: Int, style: String, updated: Long) =
-        sha1("${ai.componentName.flattenToShortString()}|${ai.user.hashCode()}|$updated|$style|$px|$VERSION")
+        sha1("${ai.componentName.flattenToShortString()}|${ai.user.hashCode()}|$updated|$style|$px|$VERSION|${dayStamp(ai.componentName.packageName)}")
+
+    /** Chronicle's icon shows today's date, so its cached picture is only good for one day. */
+    private fun dayStamp(pkg: String): Long = if (pkg == "dev.wonderdesk.chronicle") java.time.LocalDate.now().toEpochDay() else 0L
+
+    /** Writes today's month and day onto the blank flip-calendar art (coordinates are fractions of the 512 px artwork). */
+    private fun drawDate(b: Bitmap) {
+        val cv = Canvas(b); val k = b.width / 512f
+        val today = java.time.LocalDate.now()
+        val ink = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF14110F.toInt(); typeface = android.graphics.Typeface.create(android.graphics.Typeface.SANS_SERIF, android.graphics.Typeface.BOLD); textAlign = Paint.Align.CENTER }
+        // Month, turned on its side on the left card.
+        val month = today.month.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.ENGLISH).uppercase()
+        ink.textSize = 62f * k
+        cv.save(); cv.rotate(-90f, 172f * k, 276f * k); cv.drawText(month, 172f * k, 276f * k + ink.textSize * .35f, ink); cv.restore()
+        // Day number across the two right cards.
+        val d = "%02d".format(today.dayOfMonth)
+        ink.textSize = 190f * k
+        cv.drawText(d.substring(0, 1), 277f * k, 335f * k, ink)
+        cv.drawText(d.substring(1, 2), 373f * k, 335f * k, ink)
+    }
 
     private fun sha1(s: String) = MessageDigest.getInstance("SHA-1").digest(s.toByteArray()).joinToString("") { "%02x".format(it) }
 
@@ -97,7 +116,11 @@ object IconLoader {
             android.graphics.BitmapFactory.decodeResource(res, id, opts)
             opts.inSampleSize = maxOf(1, minOf(opts.outWidth, opts.outHeight) / (px * 2))
             opts.inJustDecodeBounds = false
-            android.graphics.BitmapFactory.decodeResource(res, id, opts)?.let { dev.wonderdesk.shared.trimTransparent(it) }
+            android.graphics.BitmapFactory.decodeResource(res, id, opts)?.let { bm ->
+                val bmp = if (pkg == "dev.wonderdesk.chronicle" && bm.isMutable.not()) bm.copy(Bitmap.Config.ARGB_8888, true) else bm
+                if (pkg == "dev.wonderdesk.chronicle") drawDate(bmp)
+                dev.wonderdesk.shared.trimTransparent(bmp)
+            }
         }.getOrNull()
     }
 

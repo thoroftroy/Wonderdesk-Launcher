@@ -1,4 +1,4 @@
 <resources>
-    <string name="lock_service_description">Lets Wonderdesk Launcher lock your screen when you double-tap the home screen. It reads nothing on screen.</string>
+    <string name="lock_service_description">Lets Wonderdesk Launcher lock your screen on a double-tap and show its floating button with Home, Back, Screenshot and other shortcuts. It reads nothing on screen.</string>
     <string name="wonderdesk_wallpaper_description">Wonderdesk\'s animated wallpaper: Aqua bubbles, slideshows and videos, with separate day and night looks.</string>
 </resources>

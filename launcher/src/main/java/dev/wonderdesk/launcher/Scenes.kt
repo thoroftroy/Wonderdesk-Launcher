@@ -527,7 +527,7 @@ class SceneRunner(private val w: Int, private val h: Int) {
         env.battery = battery; env.charging = charging
         val now = java.time.LocalTime.now()
         val real = now.hour + now.minute / 60f + now.second / 3600f
-        env.hour = if (cfg.fixedHour >= 0) cfg.fixedHour else if (cfg.daySpeed == 1) real else (real + clock * cfg.daySpeed / 3600f) % 24f
+        env.hour = if (cfg.fixedHour >= 0) cfg.fixedHour else if (cfg.daySpeed == 1) Sun.sceneHour(real) else (real + clock * cfg.daySpeed / 3600f) % 24f
         scene(effective(cfg).first).step(dt, env, cfg)
     }
 

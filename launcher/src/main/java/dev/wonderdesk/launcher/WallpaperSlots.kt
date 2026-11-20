@@ -19,6 +19,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Icon
 import androidx.compose.material3.HorizontalDivider
@@ -113,6 +114,8 @@ fun WallpaperSlots(toast: (String) -> Unit) {
     }
 
     QuickSetup(tick, { tick++ }, toast) { editingScene = true }
+    SunPanel()
+    LooksPanel(toast)
     Panel(title = "Wallpaper", footer = if (dayNight) "Each look can be a Wonderdesk style, a photo, a slideshow or a video. They swap by themselves at the hours below." else "One wallpaper all day. Turn on day and night to have a different one after dark.") {
         if (!took) {
             ListRow("Use Wonderdesk's Aqua wallpaper", subtitle = "Water with floating bubbles by day, deep water at night", icon = WonderIcons.Wallpaper, tint = Color(0xFF1E7FE8), chevron = true,
@@ -286,4 +289,39 @@ private fun SceneTiles(items: List<Pair<String, String>>, selected: String, onPi
             }
         }
     }
+}
+
+/** Match the animated wallpapers to the real sun: sunrise and sunset from where the phone is and the time of year. */
+@Composable
+private fun SunPanel() {
+    val context = LocalContext.current
+    var on by remember { mutableStateOf(Sun.following(context)) }
+    var perm by remember { mutableStateOf(Sun.hasLocationPermission(context)) }
+    val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok -> perm = ok; if (ok) Sun.refresh(context) }
+    LaunchedEffect(perm) { Sun.refresh(context) }
+    val t = remember(on, perm) { Sun.times() }
+    Panel(title = "Real sunrise and sunset", footer = "Uses the last position Android already knows, only to work out when the sun rises and sets. It is never sent anywhere.") {
+        SwitchRow("Match the real sun", on, { on = it; Sun.setFollowing(context, it) }, subtitle = if (t == null) "No sunrise or sunset today at this position" else "Today: sunrise ${Sun.label(t.first)}, sunset ${Sun.label(t.second)}" + if (!Sun.hasPosition(context)) " (estimated from your time zone)" else "", icon = WonderIcons.WbSunny, tint = Color(0xFFE39A12))
+        if (on && !perm) { PanelDivider(); ListRow("Allow location for exact times", subtitle = "Approximate location is enough", icon = WonderIcons.LocationOn, tint = Color(0xFF1E7FE8), chevron = true, onClick = { ask.launch(android.Manifest.permission.ACCESS_COARSE_LOCATION) }) }
+    }
+}
+
+/** Saved looks: keep the current wallpapers and lock screen as a named look, and switch between looks in one tap. */
+@Composable
+private fun LooksPanel(toast: (String) -> Unit) {
+    val context = LocalContext.current
+    var rev by remember { mutableIntStateOf(0) }
+    val names = remember(rev) { Looks.names(context) }
+    var naming by remember { mutableStateOf(false) }
+    Panel(title = "Saved looks", footer = "A look is everything about your wallpapers and lock screen. Save a few, say an animated one and a photo one, and switch from the Wonderdesk menu at the top of the home screen.") {
+        names.forEachIndexed { i, n ->
+            if (i > 0) PanelDivider()
+            ListRow(n, subtitle = "Tap to use", icon = WonderIcons.Wallpaper, tint = Color(0xFF8E44AD),
+                trailing = { TextButton(onClick = { Looks.delete(context, n); rev++ }) { Text("Delete") } },
+                onClick = { toast(if (Looks.apply(context, n)) "Switched to $n" else "Couldn't switch") })
+        }
+        if (names.isNotEmpty()) PanelDivider()
+        ListRow("Save the current look…", icon = WonderIcons.Add, tint = Color(0xFF1E7FE8), chevron = true, onClick = { naming = true })
+    }
+    if (naming) InputDialog("Name this look", "Name", confirm = "Save", onDismiss = { naming = false }) { n -> Looks.save(context, n); naming = false; rev++; toast("Saved “$n”") }
 }
