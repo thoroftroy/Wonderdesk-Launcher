@@ -1,5 +1,14 @@
 # Launcher changelog
 
+## v0.8.0
+
+- Record on the floating button now starts straight away with no prompts: Android's screen-recording permission box is answered for you (only right after you tap Record), and recording begins in clip mode so you can start, save or stop a clip from the button without any notification. The button stays usable while recording and draws nothing, so it isn't in the recording
+- The floating button is just the Wonderdesk icon at full size, with no border or tile behind it
+- Home and Back are gone from the default menu (the phone already has them); older menus drop them once. Record, Screenshot, New note, Search and Beacon lead
+- The menu opens instantly (it is built once and kept ready) and its animation is quicker
+- Controls from other apps appear at the top of the menu: Bliss Player's playback, Wayfinder's sharing and file jobs, Ripple's connection and Cinema's recording, with a dot on the button when one is there. Their notifications are unchanged. Turn them off per app in Control Room
+- Needs the accessibility switch for Wonderdesk turned off and on once after updating
+
 ## v0.7.0
 
 - Bliss and Super wallpapers redrawn from scratch. Bliss: rolling hills fading into haze, thousands of grass blades that sway in a wind wave you can see cross the field, soft layered clouds, a glowing sun, birds and the odd rainbow. Super: a real layered nebula that drifts and shifts colour, stars at three depths with a few that sparkle, flowing rainbow aurora and a ringed planet

@@ -96,7 +96,7 @@ object AssistActions {
         ) + APPS.map { (n, p) -> AssistAct("app:$p", n, null, "Apps", p) }
     }
     fun byId(id: String) = CATALOG.firstOrNull { it.id == id }
-    val DEFAULT = listOf("home", "back", "recents", "notifications", "screenshot", "lock", "rec", "clip", "newnote", "search", "app:dev.wonderdesk.beacon", "hide")
+    val DEFAULT = listOf("rec", "clip", "screenshot", "newnote", "search", "app:dev.wonderdesk.beacon", "notifications", "lock", "hide")
     /** What a tap, double tap or long press on the button itself can do. */
     val GESTURES = listOf("menu" to "Open the menu", "hide" to "Hide the button", "home" to "Home", "back" to "Back", "recents" to "Recents", "screenshot" to "Screenshot", "rec" to "Record or stop", "lock" to "Lock", "none" to "Nothing")
     val ACCENTS = listOf("look" to "Match my look", "blue" to "Blue", "green" to "Green", "purple" to "Purple", "orange" to "Orange", "red" to "Red", "graphite" to "Graphite")
@@ -112,7 +112,16 @@ object AssistActions {
     fun accentId(c: Context) = prefs(c).getString("accent", "look") ?: "look"
     fun gesture(c: Context, k: String) = prefs(c).getString("g_$k", when (k) { "tap" -> "menu"; "long" -> "hide"; else -> "none" }) ?: "none"
     fun set(c: Context, key: String, v: Any) { prefs(c).edit().apply { when (v) { is Boolean -> putBoolean(key, v); is Int -> putInt(key, v); is String -> putString(key, v) } }.apply(); LockService.instance?.refreshButton() }
-    fun chosen(c: Context): List<String> = (prefs(c).getString("actions", null)?.split(',')?.filter { it.isNotBlank() } ?: DEFAULT).filter { byId(it) != null }
+    /** Start recording in clip mode (a silent rolling buffer you save from, never a long file you forgot about). */
+    fun recClip(c: Context) = prefs(c).getBoolean("recClip", true)
+    fun chosen(c: Context): List<String> {
+        // Home and Back were in the first menu; the phone already has them, so older saved menus lose them once.
+        if (prefs(c).getInt("actionsV", 1) < 2) {
+            prefs(c).getString("actions", null)?.let { saved -> prefs(c).edit().putString("actions", saved.split(',').filter { it != "home" && it != "back" }.joinToString(",")).apply() }
+            prefs(c).edit().putInt("actionsV", 2).apply()
+        }
+        return (prefs(c).getString("actions", null)?.split(',')?.filter { it.isNotBlank() } ?: DEFAULT).filter { byId(it) != null }
+    }
     fun setChosen(c: Context, l: List<String>) { prefs(c).edit().putString("actions", l.joinToString(",")).apply() }
     fun pos(c: Context): Pair<Int, Int> = prefs(c).getInt("x", -1) to prefs(c).getInt("y", 600)
     fun setPos(c: Context, x: Int, y: Int) { prefs(c).edit().putInt("x", x).putInt("y", y).apply() }
@@ -120,6 +129,8 @@ object AssistActions {
     /** Which shortcuts to show right now: the recording ones change with what the recorder is doing. */
     fun live(c: Context): List<AssistAct> = chosen(c).mapNotNull { id ->
         val a = byId(id) ?: return@mapNotNull null
+        // Cinema puts its own card (Start clip, Save clip, Stop) at the top while recording, so its tiles would just repeat it.
+        if ((id == "rec" || id == "clip") && AssistState.recording && AssistCards.list.any { it.key == "cinema" }) return@mapNotNull null
         when (id) {
             "rec" -> if (AssistState.recording && !AssistState.clipMode) a.copy(label = "Stop", icon = WonderIcons.Stop) else if (AssistState.recording) a.copy(label = "Clips off", icon = WonderIcons.Stop) else a
             "clip" -> if (!AssistState.recording || !AssistState.clipMode) null else if (AssistState.writing) a.copy(label = "Save clip") else a.copy(label = "Start clip")
@@ -151,7 +162,11 @@ object AssistActions {
             id == "split" -> global(AccessibilityService.GLOBAL_ACTION_TOGGLE_SPLIT_SCREEN)
             id == "volup" -> s.getSystemService(android.media.AudioManager::class.java).adjustStreamVolume(android.media.AudioManager.STREAM_MUSIC, android.media.AudioManager.ADJUST_RAISE, android.media.AudioManager.FLAG_SHOW_UI)
             id == "voldown" -> s.getSystemService(android.media.AudioManager::class.java).adjustStreamVolume(android.media.AudioManager.STREAM_MUSIC, android.media.AudioManager.ADJUST_LOWER, android.media.AudioManager.FLAG_SHOW_UI)
-            id == "rec" -> if (AssistState.recording) toCinema(s, RecorderBridge.STOP) else runCatching { s.startActivity(Intent().setClassName("dev.wonderdesk.cinema", "dev.wonderdesk.cinema.RecordActivity").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+            id == "rec" -> if (AssistState.recording) toCinema(s, RecorderBridge.STOP) else {
+                // No prompts: the accessibility service presses Start on Android's screen-capture permission for the next few seconds.
+                AutoConfirm.arm()
+                runCatching { s.startActivity(Intent().setClassName("dev.wonderdesk.cinema", "dev.wonderdesk.cinema.RecordActivity").putExtra("clip", recClip(s)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION)) }
+            }
             id == "clip" -> if (AssistState.writing) toCinema(s, RecorderBridge.SAVE_CLIP) else toCinema(s, RecorderBridge.CLIP)
             id == "newnote" -> openApp(s, "dev.wonderdesk.scribble") { putExtra("new", true) }
             id == "newevent" -> openApp(s, "dev.wonderdesk.chronicle") { putExtra("new", true) }
@@ -159,6 +174,14 @@ object AssistActions {
             id == "hide" -> { AssistState.hidden = true; LockService.instance?.refreshButton() }
         }
     }
+}
+
+/** The short window after tapping Record in which the accessibility service answers Android's screen-capture permission dialog. */
+object AutoConfirm {
+    @Volatile private var until = 0L
+    fun arm() { until = System.currentTimeMillis() + 25_000; LockService.instance?.resetRechecks() }
+    fun disarm() { until = 0L }
+    fun active() = System.currentTimeMillis() < until
 }
 
 /** The names of Cinema's remote controls (kept in step with Cinema's RecorderControl). */
@@ -190,6 +213,10 @@ class FloatingButton(private val s: AccessibilityService) {
     private val wm = s.getSystemService(WindowManager::class.java)
     private var buttonView: ComposeView? = null
     private var panelView: ComposeView? = null
+    private var panelParams: WindowManager.LayoutParams? = null
+    private val panelOpen = mutableStateOf(false)
+    private val anchor = mutableStateOf(intArrayOf(0, 0, 0, 0))
+    private val handler = android.os.Handler(android.os.Looper.getMainLooper())
     private val owner = OverlayOwner()
     private var buttonParams: WindowManager.LayoutParams? = null
     private var receiver: BroadcastReceiver? = null
@@ -214,6 +241,7 @@ class FloatingButton(private val s: AccessibilityService) {
         buttonParams = p
         val v = compose { ButtonBody(p) }
         runCatching { wm.addView(v, p) }.onSuccess { buttonView = v }
+        addPanel()
     }
 
     /** Recording state comes from Cinema; the button hides itself from the recording while it runs. */
@@ -245,9 +273,8 @@ class FloatingButton(private val s: AccessibilityService) {
         val squircle = RoundedCornerShape(30)
         fun doGesture(id: String) { when (id) { "menu" -> openPanel(p); "none" -> {}; else -> { if (id == "hide") view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS); AssistActions.run(s, id) } } }
         Box(Modifier.fillMaxSize().graphicsLayer { alpha = btnAlpha; scaleX = scale; scaleY = scale }
-            .shadow(if (recordingHide) 0.dp else 8.dp, CircleShape)
-            .clip(CircleShape).background(Brush.verticalGradient(listOf(accent.copy(alpha = .95f), accent.copy(alpha = .78f))))
-            .border(1.5.dp, Color.White.copy(alpha = .55f), CircleShape)
+            .shadow(if (recordingHide) 0.dp else 6.dp, CircleShape)
+            .clip(CircleShape)
             .pointerInput(Unit) { detectTapGestures(onPress = { pressed = true; lastTouch = System.currentTimeMillis(); tryAwaitRelease(); pressed = false; lastTouch = System.currentTimeMillis() },
                 onTap = { doGesture(AssistActions.gesture(context, "tap")) }, onDoubleTap = { doGesture(AssistActions.gesture(context, "double")) }, onLongPress = { view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS); doGesture(AssistActions.gesture(context, "long")) }) }
             .pointerInput(Unit) { detectDragGestures(onDragStart = { lastTouch = System.currentTimeMillis(); pressed = false }, onDragEnd = {
@@ -257,60 +284,80 @@ class FloatingButton(private val s: AccessibilityService) {
                 p.x = (p.x + d.x.roundToInt()).coerceIn(0, (dm.widthPixels - p.width).coerceAtLeast(0)); p.y = (p.y + d.y.roundToInt()).coerceIn(0, (dm.heightPixels - p.height).coerceAtLeast(0))
                 runCatching { wm.updateViewLayout(buttonView, p) } }) },
             contentAlignment = Alignment.Center) {
-            if (art != null) Image(art, null, Modifier.fillMaxSize(.62f))
+            // The Wonderdesk icon itself, the whole size of the button: no border, no tile behind it.
+            if (art != null) Image(art, null, Modifier.fillMaxSize(), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
+        }
+        // A small dot when an app has put a control on the button (recording, playback, a transfer).
+        if (AssistCards.list.isNotEmpty() && !recordingHide) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopEnd) {
+            Box(Modifier.size(14.dp).clip(CircleShape).background(Color(0xFFFFB020)).border(1.5.dp, Color.White, CircleShape))
         }
     }
 
-    private fun openPanel(bp: WindowManager.LayoutParams) {
+    /** The menu is built once, right after the button, and kept ready (a 1 pixel window nobody can touch), so opening it is instant. */
+    private fun addPanel() {
         if (panelView != null) return
-        val full = lp(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT)
-        full.flags = full.flags or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
-        val v = compose { PanelBody(bp) }
-        runCatching { wm.addView(v, full) }.onSuccess { panelView = v }
+        val p = lp(1, 1); p.flags = p.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+        val v = compose { PanelBody() }
+        runCatching { wm.addView(v, p) }.onSuccess { panelView = v; panelParams = p }
     }
 
-    private fun closePanelNow() { panelView?.let { runCatching { wm.removeView(it) } }; panelView = null }
+    private fun openPanel(bp: WindowManager.LayoutParams) {
+        val v = panelView ?: return; val p = panelParams ?: return
+        handler.removeCallbacksAndMessages(null)
+        anchor.value = intArrayOf(bp.x, bp.y, bp.width, bp.height)
+        p.width = WindowManager.LayoutParams.MATCH_PARENT; p.height = WindowManager.LayoutParams.MATCH_PARENT
+        p.flags = p.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
+        runCatching { wm.updateViewLayout(v, p) }
+        panelOpen.value = true
+    }
+
+    private fun closePanel() {
+        panelOpen.value = false
+        // Let the closing animation finish, then shrink the window back so it can't catch touches.
+        handler.postDelayed({
+            val v = panelView ?: return@postDelayed; val p = panelParams ?: return@postDelayed
+            p.width = 1; p.height = 1; p.flags = p.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+            runCatching { wm.updateViewLayout(v, p) }
+        }, 160)
+    }
 
     @Composable
-    private fun PanelBody(bp: WindowManager.LayoutParams) {
+    private fun PanelBody() {
         val context = LocalContext.current
         val pal = wonderPalette()
         val accent = AssistActions.accent(AssistActions.accentId(context), pal.accent)
-        var open by remember { mutableStateOf(false) }
-        var closing by remember { mutableStateOf(false) }
-        LaunchedEffect(Unit) { open = true }
-        LaunchedEffect(closing) { if (closing) { open = false; delay(220); closePanelNow() } }
-        val acts = remember(AssistState.recording, AssistState.clipMode, AssistState.writing) { AssistActions.live(context) }
-        val cols = if (acts.size <= 3) acts.size.coerceAtLeast(1) else if (acts.size <= 8) 4 else 4
+        val open = panelOpen.value
+        val bx = anchor.value[0]; val by = anchor.value[1]; val bw = anchor.value[2]; val bh = anchor.value[3]
+        val acts = AssistActions.live(context)
+        val cols = if (acts.size <= 3) acts.size.coerceAtLeast(1) else 4
         val cell = 84.dp
         val panelW = cell * cols + 20.dp
         val density = dm.density
         val rows = (acts.size + cols - 1) / cols
-        val panelH = 46.dp + (cell + 4.dp) * rows + 14.dp
+        val cardsH = AssistCards.list.sumOf { (52 + (if (it.progress in 0..100) 10 else 0) + (if (it.actions.isNotEmpty()) 34 else 0) + 6) }.dp
+        val panelH = 46.dp + (cell + 4.dp) * rows + 14.dp + cardsH
         val panelWpx = panelW.value * density; val panelHpx = panelH.value * density
-        val cx = bp.x + bp.width / 2f
+        val cx = bx + bw / 2f
         val px = (cx - panelWpx / 2f).coerceIn(8 * density, dm.widthPixels - panelWpx - 8 * density)
-        val below = bp.y + bp.height + 10 * density + panelHpx < dm.heightPixels - 40 * density
-        val py = if (below) bp.y + bp.height + 10 * density else (bp.y - panelHpx - 10 * density).coerceAtLeast(24 * density)
-        // The menu grows out of the button and shrinks back into it.
+        val below = by + bh + 10 * density + panelHpx < dm.heightPixels - 40 * density
+        val py = if (below) by + bh + 10 * density else (by - panelHpx - 10 * density).coerceAtLeast(24 * density)
+        // The menu grows out of the button and shrinks back into it, quickly.
         val origin = TransformOrigin(((cx - px) / panelWpx).coerceIn(0f, 1f), if (below) 0f else 1f)
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = if (open) .22f else 0f)).clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { closing = true }) {
-            AnimatedVisibility(open, Modifier.offset { IntOffset(px.roundToInt(), py.roundToInt()) }, enter = scaleIn(spring(dampingRatio = .72f, stiffness = 520f), initialScale = .3f, transformOrigin = origin) + fadeIn(tween(120)),
-                exit = scaleOut(tween(160), targetScale = .3f, transformOrigin = origin) + fadeOut(tween(140))) {
+        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = if (open) .18f else 0f)).clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { closePanel() }) {
+            AnimatedVisibility(open, Modifier.offset { IntOffset(px.roundToInt(), py.roundToInt()) }, enter = scaleIn(tween(110), initialScale = .5f, transformOrigin = origin) + fadeIn(tween(90)),
+                exit = scaleOut(tween(90), targetScale = .5f, transformOrigin = origin) + fadeOut(tween(80))) {
                 Column(Modifier.width(panelW).shadow(14.dp, RoundedCornerShape(pal.panelRadius + 10.dp)).clip(RoundedCornerShape(pal.panelRadius + 10.dp)).background(pal.window).border(1.dp, pal.panelBorder, RoundedCornerShape(pal.panelRadius + 10.dp))
                     .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}.padding(10.dp)) {
                     Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text("Wonderdesk", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = pal.text)
                         if (AssistState.recording) Row(verticalAlignment = Alignment.CenterVertically) { Box(Modifier.size(8.dp).clip(CircleShape).background(Color(0xFFE5483C))); Spacer(Modifier.width(5.dp)); Text(if (AssistState.writing) "Recording" else if (AssistState.clipMode) "Clips on" else "Recording", style = MaterialTheme.typography.labelSmall, color = pal.secondaryText) }
                     }
+                    AssistCardsSection(accent) { closePanel() }
                     acts.chunked(cols).forEach { row ->
                         Row(Modifier.fillMaxWidth()) {
-                            row.forEachIndexed { i, a ->
-                                var shown by remember { mutableStateOf(false) }
-                                LaunchedEffect(Unit) { delay(18L * i); shown = true }
-                                val k by animateFloatAsState(if (shown) 1f else .6f, spring(dampingRatio = .6f, stiffness = 500f), label = "cell")
-                                Column(Modifier.width(cell).height(cell + 4.dp).graphicsLayer { scaleX = k; scaleY = k; alpha = k.coerceIn(0f, 1f) }.clip(RoundedCornerShape(pal.panelRadius + 2.dp))
-                                    .clickable { closing = true; val id = a.id; (buttonView ?: panelView)?.postDelayed({ AssistActions.run(s, if (id == "rec" || id == "clip") id else id) }, 260) }.padding(6.dp),
+                            row.forEach { a ->
+                                Column(Modifier.width(cell).height(cell + 4.dp).clip(RoundedCornerShape(pal.panelRadius + 2.dp))
+                                    .clickable { closePanel(); val id = a.id; handler.postDelayed({ AssistActions.run(s, id) }, 140) }.padding(6.dp),
                                     horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                                     val danger = a.id == "rec" && AssistState.recording
                                     Box(Modifier.size(42.dp).clip(CircleShape).background((if (danger) Color(0xFFE5483C) else accent).copy(alpha = .14f)), contentAlignment = Alignment.Center) {
@@ -328,7 +375,8 @@ class FloatingButton(private val s: AccessibilityService) {
     }
 
     fun hide() {
-        closePanelNow()
+        handler.removeCallbacksAndMessages(null); panelOpen.value = false
+        panelView?.let { runCatching { wm.removeView(it) } }; panelView = null; panelParams = null
         buttonView?.let { runCatching { wm.removeView(it) } }; buttonView = null
     }
 

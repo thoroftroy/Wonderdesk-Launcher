@@ -1,3 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android" android:description="@string/lock_service_description"
-    android:accessibilityEventTypes="typeWindowStateChanged" android:accessibilityFeedbackType="feedbackGeneric" android:canPerformGestures="false" android:notificationTimeout="1000" />
+    android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged" android:accessibilityFeedbackType="feedbackGeneric" android:canPerformGestures="false"
+    android:canRetrieveWindowContent="true" android:packageNames="com.android.systemui" android:notificationTimeout="100" />

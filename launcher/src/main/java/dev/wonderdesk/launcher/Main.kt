@@ -189,7 +189,45 @@ class LockService : AccessibilityService() {
         floating?.destroy(); floating = null
         if (AssistActions.enabled(this)) floating = FloatingButton(this).also { it.show() }
     }
-    override fun onAccessibilityEvent(event: AccessibilityEvent?) {}
+    private var lastPress = 0L
+    private val recheck = android.os.Handler(android.os.Looper.getMainLooper())
+    private var rechecks = 0
+    fun resetRechecks() { rechecks = 0 }
+    /**
+     * Only after you tap Record on the floating button, and only on Android's own screen-capture permission box, this presses the
+     * answers for you (the entire screen, then Start), so recording begins with no prompts. At any other time it does nothing.
+     */
+    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        if (!AutoConfirm.active() || event?.packageName?.toString() != "com.android.systemui") return
+        if (System.currentTimeMillis() - lastPress < 350) return
+        val root = rootInActiveWindow ?: return
+        runCatching { answerCapturePrompt(root) }
+    }
+
+    private fun answerCapturePrompt(root: android.view.accessibility.AccessibilityNodeInfo) {
+        fun find(vararg t: String) = t.flatMap { root.findAccessibilityNodeInfosByText(it).orEmpty() }
+        fun press(n: android.view.accessibility.AccessibilityNodeInfo): Boolean {
+            var x: android.view.accessibility.AccessibilityNodeInfo? = n
+            while (x != null) { if (x.isClickable && x.isEnabled) { lastPress = System.currentTimeMillis(); val ok = x.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK)
+                // The box changes after each answer without always telling us, so look again shortly.
+                if (AutoConfirm.active() && rechecks < 8) { rechecks++; recheck.postDelayed({ if (AutoConfirm.active()) rootInActiveWindow?.let { r -> if (r.packageName?.toString() == "com.android.systemui") runCatching { answerCapturePrompt(r) } } }, 450) }
+                return ok }; x = x.parent }
+            return false
+        }
+        val entire = find("entire screen"); val oneApp = find("one app", "single app")
+        // Real buttons only: the box's heading also says "Start recording".
+        val start = find("Start now", "Start", "Share screen", "Next").filter { it.className?.toString()?.contains("Button") == true && it.isEnabled }
+        when {
+            // The target is the entire screen: go ahead.
+            entire.isNotEmpty() && oneApp.isEmpty() && start.isNotEmpty() -> { if (start.any { press(it) }) AutoConfirm.disarm() }
+            // The list of targets is open: pick the entire screen.
+            entire.isNotEmpty() && oneApp.isNotEmpty() -> entire.firstOrNull { press(it) }
+            // The box starts on "one app": open the list.
+            oneApp.isNotEmpty() -> oneApp.firstOrNull { press(it) }
+            // Older Android has no choice to make.
+            start.isNotEmpty() -> { if (start.any { press(it) }) AutoConfirm.disarm() }
+        }
+    }
     override fun onInterrupt() {}
     override fun onDestroy() { floating?.destroy(); instance = null; super.onDestroy() }
     companion object { var instance: LockService? = null }

@@ -1,5 +1,5 @@
 <resources>
-    <string name="lock_service_description">Lets Wonderdesk Launcher lock your screen on a double-tap and show its floating button with Home, Back, Screenshot and other shortcuts. It reads nothing on screen.</string>
+    <string name="lock_service_description">Lets Wonderdesk Launcher lock your screen on a double-tap and show its floating button. When you tap Record on that button it also presses Start on Android\'s screen-recording permission box so recording begins without prompts, and that is the only screen it ever looks at.</string>
     <string name="wonderdesk_wallpaper_description">Wonderdesk\'s animated wallpaper: Aqua bubbles, slideshows and videos, with separate day and night looks.</string>
     <string name="shortcut_assist_short">Floating button</string>
     <string name="shortcut_assist_long">Show or hide the floating button</string>

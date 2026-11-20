@@ -48,7 +48,7 @@ fun AssistSettingsPanel(needAccess: () -> Unit) {
             SwitchRow("Visible right now", !hidden, { v -> AssistState.hidden = !v; LockService.instance?.refreshButton() }, subtitle = "Bring it back any time from the Floating button tile in Quick Settings, or the Wonderdesk icon's long-press shortcut", icon = WonderIcons.Visibility, tint = Color(0xFF16A085))
             PanelDivider()
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Colour", style = MaterialTheme.typography.titleSmall)
+                Text("Menu colour", style = MaterialTheme.typography.titleSmall)
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     AssistActions.ACCENTS.forEach { (id, label) ->
                         val col = AssistActions.accent(id, p.accent)
@@ -65,7 +65,13 @@ fun AssistSettingsPanel(needAccess: () -> Unit) {
             PanelDivider()
             SwitchRow("Snap to the screen edge", snap, { snap = it; AssistActions.set(context, "snap", it) }, subtitle = "Off: it stays exactly where you drop it", icon = WonderIcons.Gesture, tint = Color(0xFF8E44AD))
             PanelDivider()
+            var recClip by remember { mutableStateOf(AssistActions.recClip(context)) }
+            SwitchRow("Record starts in clip mode", recClip, { recClip = it; AssistActions.set(context, "recClip", it) }, subtitle = "Tapping Record starts Cinema straight away with no prompts, silently keeping the last few seconds. Start a clip, save it or stop from the button's menu. Off: a normal full recording", icon = WonderIcons.Videocam, tint = Color(0xFFE5483C))
+            PanelDivider()
             SwitchRow("Hide while recording", hideRec, { hideRec = it; AssistActions.set(context, "hideRec", it) }, subtitle = "Draws nothing during a screen recording or clip mode, so it can't be in the video. A tap in the same spot still opens the menu, with Stop and Clip", icon = WonderIcons.Videocam, tint = Color(0xFFE5483C))
+            PanelDivider()
+            var cards by remember { mutableStateOf(AssistCards.enabled(context)) }
+            SwitchRow("Show app controls", cards, { cards = it; AssistCards.setEnabled(context, it); if (!it) AssistCards.list.clear() }, subtitle = "Apps that have a control notification (Bliss Player's playback, Wayfinder's sharing and file jobs, Ripple's connection, Cinema's recording) also put it at the top of this menu. Their notifications stay as they are, so nothing changes for anyone not using the button. Choose per app in Control Room", icon = WonderIcons.Notifications, tint = Color(0xFFE5483C))
             PanelDivider()
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text("On the button itself", style = MaterialTheme.typography.titleSmall)
