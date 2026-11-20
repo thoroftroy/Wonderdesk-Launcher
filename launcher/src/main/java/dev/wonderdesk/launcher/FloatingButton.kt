@@ -115,13 +115,13 @@ object AssistActions {
     /** Start recording in clip mode (a silent rolling buffer you save from, never a long file you forgot about). */
     fun recClip(c: Context) = prefs(c).getBoolean("recClip", true)
     fun chosen(c: Context): List<String> {
-        // Home and Back were in the first menu; the phone already has them, so older saved menus lose them once.
-        if (prefs(c).getInt("actionsV", 1) < 2) {
-            prefs(c).getString("actions", null)?.let { saved -> prefs(c).edit().putString("actions", saved.split(',').filter { it != "home" && it != "back" }.joinToString(",")).apply() }
-            prefs(c).edit().putInt("actionsV", 2).apply()
-        }
-        return (prefs(c).getString("actions", null)?.split(',')?.filter { it.isNotBlank() } ?: DEFAULT).filter { byId(it) != null }
+        // The menu changed a lot (Home and Back went, Record leads). Everyone starts from the new default once, so an old saved list can
+        // never leave it without Record or empty; after that your own choices are kept.
+        if (prefs(c).getInt("actionsV", 1) < 3) prefs(c).edit().remove("actions").putInt("actionsV", 3).apply()
+        val saved = prefs(c).getString("actions", null)?.split(',')?.filter { it.isNotBlank() && byId(it) != null }.orEmpty()
+        return saved.ifEmpty { DEFAULT }
     }
+    fun resetChosen(c: Context) { prefs(c).edit().remove("actions").apply() }
     fun setChosen(c: Context, l: List<String>) { prefs(c).edit().putString("actions", l.joinToString(",")).apply() }
     fun pos(c: Context): Pair<Int, Int> = prefs(c).getInt("x", -1) to prefs(c).getInt("y", 600)
     fun setPos(c: Context, x: Int, y: Int) { prefs(c).edit().putInt("x", x).putInt("y", y).apply() }
@@ -353,6 +353,10 @@ class FloatingButton(private val s: AccessibilityService) {
                         if (AssistState.recording) Row(verticalAlignment = Alignment.CenterVertically) { Box(Modifier.size(8.dp).clip(CircleShape).background(Color(0xFFE5483C))); Spacer(Modifier.width(5.dp)); Text(if (AssistState.writing) "Recording" else if (AssistState.clipMode) "Clips on" else "Recording", style = MaterialTheme.typography.labelSmall, color = pal.secondaryText) }
                     }
                     AssistCardsSection(accent) { closePanel() }
+                    if (acts.isEmpty() && AssistCards.list.isEmpty()) Column(Modifier.fillMaxWidth().padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("This menu has no shortcuts.", style = MaterialTheme.typography.bodyMedium, color = pal.text)
+                        Text("Restore the default menu", Modifier.padding(top = 8.dp).clip(RoundedCornerShape(16.dp)).background(accent.copy(alpha = .16f)).clickable { AssistActions.resetChosen(context) }.padding(horizontal = 14.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge, color = accent)
+                    }
                     acts.chunked(cols).forEach { row ->
                         Row(Modifier.fillMaxWidth()) {
                             row.forEach { a ->

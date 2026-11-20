@@ -30,7 +30,7 @@
     "guidebook": "0.2.0",
     "checkup": "0.2.0",
     "fetch": "0.2.0",
-    "launcher": "0.8.0"
+    "launcher": "0.8.1"
   },
   "tools": {
     "installer": "0.2.2",

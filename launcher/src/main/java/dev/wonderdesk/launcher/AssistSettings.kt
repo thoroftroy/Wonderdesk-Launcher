@@ -80,6 +80,7 @@ fun AssistSettingsPanel(needAccess: () -> Unit) {
             PanelDivider()
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Shortcuts in its menu (${chosen.size})", style = MaterialTheme.typography.titleSmall)
+                Text("Restore the default shortcuts", Modifier.clip(RoundedCornerShape(16.dp)).background(p.accent.copy(alpha = .14f)).clickable { AssistActions.resetChosen(context); chosen = AssistActions.chosen(context) }.padding(horizontal = 12.dp, vertical = 6.dp), style = MaterialTheme.typography.labelLarge, color = p.accent)
                 Text("Pick what the menu holds. Recording shortcuts change with what the recorder is doing: Record becomes Stop, Clip appears in clip mode.", style = MaterialTheme.typography.bodySmall, color = p.secondaryText)
                 listOf("System", "Recording", "Quick", "Apps").forEach { group ->
                     Text(group, style = MaterialTheme.typography.labelLarge, color = p.accent)

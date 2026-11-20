@@ -1,5 +1,9 @@
 # Launcher changelog
 
+## v0.8.1
+
+- Fixed the floating button's menu coming up empty or without Record: everyone's menu starts from the new default once (Record, Screenshot, New note, Search, Beacon, Alerts, Lock, Hide), an empty list can no longer happen, and an empty menu now has a Restore the default menu button (also in settings)
+
 ## v0.8.0
 
 - Record on the floating button now starts straight away with no prompts: Android's screen-recording permission box is answered for you (only right after you tap Record), and recording begins in clip mode so you can start, save or stop a clip from the button without any notification. The button stays usable while recording and draws nothing, so it isn't in the recording
