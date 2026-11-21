@@ -1,5 +1,13 @@
 # Launcher changelog
 
+## v0.10.0
+
+- Floating button notifications are now grouped by app with Show all, Hide and Clear, scroll instead of filling the screen, can be swiped or crossed away, have Clear all, and old ones expire after ten minutes
+- Home screen settings are split into tabs: Look, Layout, Gestures, Button and More
+- The Chronicle icon's month and day now tilt with the calendar art instead of sitting straight on
+- Fixed a gap above the keyboard in screens with a bottom tab bar: the tab bar now steps aside while you type, so you can see what you are writing
+- Dragging an app: the icon is now drawn above your finger and lands exactly where it is drawn (it used to land where your finger was), the other icons no longer wobble, and the picture follows your finger correctly under the status bar
+
 ## v0.9.0
 
 - Ripple shortcuts: New note can make a Ripple note (kept in sync with your computer) instead of a Scribble note (floating button settings, New note makes), plus Ripple note, Notepads, Files and Wake PC as shortcuts of their own. Ripple's computer and terminal status cards show at the top of the menu

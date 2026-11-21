@@ -58,6 +58,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
@@ -87,6 +88,7 @@ import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
@@ -294,6 +296,10 @@ class DragController {
     var payload by mutableStateOf<Payload?>(null)
     var dragging by mutableStateOf(false)
     var pos by mutableStateOf(Offset.Zero)
+    /** How far above the finger the dragged icon is drawn, so the finger never hides it. */
+    var lift = 0f
+    /** Where the dragged icon is shown, and so where it lands: this, not the raw finger position. */
+    val aim get() = Offset(pos.x, pos.y - lift)
     var hover by mutableStateOf<Hover?>(null)
     var gridRect = Rect.Zero
     var cellW = 1f; var cellH = 1f
@@ -345,9 +351,9 @@ private fun Modifier.liftable(key: Any, coords: Coords, drag: DragController, pa
         if (!dragging) { wiggle.animateTo(0f, androidx.compose.animation.core.tween(120)); return@LaunchedEffect }
         val phase = (key.hashCode() and 3) * 40L
         kotlinx.coroutines.delay(phase)
-        while (true) { wiggle.animateTo(1f, androidx.compose.animation.core.tween(130)); wiggle.animateTo(-1f, androidx.compose.animation.core.tween(130)) }
+        // No wobble: icons stay still while one is carried, so the landing spot is easy to read.
     }
-    graphicsLayer { scaleX = sc; scaleY = sc; rotationZ = wiggle.value * 2.2f }.pointerInput(key) {
+    graphicsLayer { scaleX = sc; scaleY = sc }.pointerInput(key) {
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false)
             itemTouch = true
@@ -493,9 +499,9 @@ fun Desktop(activity: MainActivity) {
     }
     LaunchedEffect(drag.dragging) {
         while (drag.dragging) {
-            drag.hover = computeHover(drag.pos)
+            drag.hover = computeHover(drag.aim)
             val edge = with(density) { 26.dp.toPx() }
-            val inRows = drag.pos.y in drag.gridRect.top..drag.gridRect.bottom
+            val inRows = drag.aim.y in drag.gridRect.top..drag.gridRect.bottom
             val dir = when { inRows && drag.pos.x < drag.gridRect.left + edge -> -1; inRows && drag.pos.x > drag.gridRect.right - edge -> 1; else -> 0 }
             if (dir != drag.edgeDir) { drag.edgeDir = dir; drag.edgeSince = System.currentTimeMillis() }
             if (dir != 0 && System.currentTimeMillis() - drag.edgeSince > 600) {
@@ -509,7 +515,7 @@ fun Desktop(activity: MainActivity) {
     }
     fun drop() {
         val pl = drag.payload ?: run { drag.reset(); return }
-        val h = computeHover(drag.pos)
+        val h = computeHover(drag.aim)
         val key = pl.appKey
         fun removeSource() { when (pl) {
             is Payload.HomeItem -> Home.remove(context, pl.item.id)
@@ -717,7 +723,11 @@ private fun DragGhost(pl: Payload, drag: DragController) {
     val size = (60 * Home.settings.iconScale).dp
     val px = with(LocalDensity.current) { size.toPx() }
     val scale by animateFloatAsState(if (drag.hover is Hover.Remove || drag.hover is Hover.Uninstall) .8f else 1.18f, spring(stiffness = 600f), label = "ghost")
-    Box(Modifier.offset { IntOffset((drag.pos.x - px / 2).roundToInt(), (drag.pos.y - px * .75f).roundToInt()) }.size(size).graphicsLayer { scaleX = scale; scaleY = scale; alpha = .92f }) {
+    SideEffect { drag.lift = px * .55f }
+    // The overlay may sit inside system-bar padding, so measure where it really starts and draw relative to that.
+    var origin by remember { mutableStateOf(Offset.Zero) }
+    Box(Modifier.fillMaxSize().onGloballyPositioned { origin = it.positionInRoot() })
+    Box(Modifier.offset { IntOffset((drag.aim.x - origin.x - px / 2).roundToInt(), (drag.aim.y - origin.y - px / 2).roundToInt()) }.size(size).graphicsLayer { scaleX = scale; scaleY = scale; alpha = .95f }) {
         when (pl) {
             is Payload.HomeItem -> when (val i = pl.item) {
                 is Item.Folder -> FolderTile(i.apps, size)
@@ -1608,13 +1618,18 @@ private fun LauncherSettings(onClose: () -> Unit, onWallpaper: () -> Unit) {
     if (barPreview) BarPreview(s, { set(it) }, { barPreview = false })
     val export = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { u -> u?.let { runCatching { context.contentResolver.openOutputStream(it, "wt")!!.use { o -> o.write(Home.exportLayout().toByteArray()) } } } }
     val import = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { u -> u?.let { runCatching { Home.importLayout(context, context.contentResolver.openInputStream(it)!!.bufferedReader().readText()) } } }
+    var tab by rememberSaveable { mutableStateOf("look") }
     var hiddenOpen by remember { mutableStateOf(false) }
     var lockGuide by remember { mutableStateOf(false) }
     var confirmReset by remember { mutableStateOf(false) }
     if (lockGuide) AccessGuide(SpecialAccess.Kind.ACCESSIBILITY, "To lock the screen with a gesture, Android needs Wonderdesk's “double-tap to lock” accessibility switch on. It only locks the screen and reads nothing.",
         onDismiss = { lockGuide = false }, component = LockService::class.java)
-    WonderApp(needs = APP_NEEDS, appName = "Wonderdesk Launcher", about = "The Wonderdesk home screen: an Aqua desktop with a magnifying Dock, folders, widgets and gestures. All your apps are in Beacon.", title = "Home screen", onBack = onClose) {
+    WonderApp(needs = APP_NEEDS, appName = "Wonderdesk Launcher", about = "The Wonderdesk home screen: an Aqua desktop with a magnifying Dock, folders, widgets and gestures. All your apps are in Beacon.", title = "Home screen", onBack = onClose,
+        tabs = listOf(WonderTab("look", "Look", WonderIcons.Palette), WonderTab("layout", "Layout", WonderIcons.Apps), WonderTab("gestures", "Gestures", WonderIcons.TouchApp), WonderTab("button", "Button", WonderIcons.Bolt), WonderTab("more", "More", WonderIcons.Backup)),
+        selectedTab = tab, onTab = { tab = it }) {
         Page {
+            when (tab) {
+                "look" -> {
             Panel(title = "Default home") {
                 val isDefault = context.isDefaultHome()
                 ListRow(if (isDefault) "Wonderdesk is your home screen" else "Make Wonderdesk your home screen", subtitle = if (isDefault) "Change it in Android's home app setting" else "Android will ask you to confirm",
@@ -1649,7 +1664,8 @@ private fun LauncherSettings(onClose: () -> Unit, onWallpaper: () -> Unit) {
                 PanelDivider()
                 ListRow("Refresh icons", subtitle = "Redraw every icon now", icon = WonderIcons.Refresh, tint = Color(0xFF1E7FE8), onClick = { IconLoader.clearDisk(context); Home.reloadIcons(context) })
             }
-            AssistSettingsPanel(needAccess = { lockGuide = true })
+                }
+                "layout" -> {
             Panel(title = "Layout") {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("Columns: ${s.cols}", style = MaterialTheme.typography.titleSmall); Segmented(listOf("3", "4", "5", "6"), s.cols - 3) { set(s.copy(cols = it + 3)) }
@@ -1677,6 +1693,8 @@ private fun LauncherSettings(onClose: () -> Unit, onWallpaper: () -> Unit) {
                 SwitchRow("Reflections", s.reflections, { set(s.copy(reflections = it)) }, subtitle = "Mirror the icons on the glass shelf"); PanelDivider()
                 ListRow("Clear the Dock", icon = WonderIcons.DeleteSweep, tint = Color(0xFF7A7F87), onClick = { Home.dock = emptyList(); Home.save(context) })
             }
+                }
+                "gestures" -> {
             Panel(title = "Gestures") {
                 listOf(Triple("Swipe up", s.swipeUp) { v: String -> set(s.copy(swipeUp = v)) }, Triple("Swipe down", s.swipeDown) { v: String -> set(s.copy(swipeDown = v)) },
                     Triple("Double-tap", s.doubleTap) { v: String -> set(s.copy(doubleTap = v)) }).forEachIndexed { i, (label, cur, setter) ->
@@ -1700,10 +1718,17 @@ private fun LauncherSettings(onClose: () -> Unit, onWallpaper: () -> Unit) {
                 SwitchRow("Folders first", s.lpFoldersFirst, { set(s.copy(lpFoldersFirst = it)) }); PanelDivider()
                 ListRow("Hidden apps", subtitle = "${Home.hidden.size} hidden", icon = WonderIcons.VisibilityOff, tint = Color(0xFF7A7F87), chevron = true, onClick = { hiddenOpen = true })
             }
+                }
+                "button" -> {
+            AssistSettingsPanel(needAccess = { lockGuide = true })
+                }
+                else -> {
             Panel(title = "Backup") {
                 ListRow("Export layout", icon = WonderIcons.Download, tint = Color(0xFF16A085), onClick = { export.launch("wonderdesk-home.json") }); PanelDivider()
                 ListRow("Import layout", icon = WonderIcons.UploadFile, tint = Color(0xFF1E7FE8), onClick = { import.launch(arrayOf("application/json", "*/*")) }); PanelDivider()
                 ListRow("Reset home screen", subtitle = "Start again with the default layout", icon = WonderIcons.Restore, danger = true, onClick = { confirmReset = true })
+            }
+                }
             }
         }
     }

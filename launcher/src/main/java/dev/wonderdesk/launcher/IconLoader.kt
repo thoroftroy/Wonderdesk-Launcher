@@ -63,12 +63,13 @@ object IconLoader {
         // Month, turned on its side on the left card.
         val month = today.month.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.ENGLISH).uppercase()
         ink.textSize = 62f * k
-        cv.save(); cv.rotate(-90f, 172f * k, 276f * k); cv.drawText(month, 172f * k, 276f * k + ink.textSize * .35f, ink); cv.restore()
+        // The calendar art sits at a slight angle, so the writing is tilted to match instead of sitting straight on.
+        cv.save(); cv.rotate(-94f, 172f * k, 276f * k); cv.drawText(month, 172f * k, 276f * k + ink.textSize * .35f, ink); cv.restore()
         // Day number across the two right cards.
         val d = "%02d".format(today.dayOfMonth)
         ink.textSize = 190f * k
-        cv.drawText(d.substring(0, 1), 277f * k, 335f * k, ink)
-        cv.drawText(d.substring(1, 2), 373f * k, 335f * k, ink)
+        cv.save(); cv.rotate(-4f, 277f * k, 268f * k); cv.drawText(d.substring(0, 1), 277f * k, 335f * k, ink); cv.restore()
+        cv.save(); cv.rotate(-4f, 373f * k, 268f * k); cv.drawText(d.substring(1, 2), 373f * k, 333f * k, ink); cv.restore()
     }
 
     private fun sha1(s: String) = MessageDigest.getInstance("SHA-1").digest(s.toByteArray()).joinToString("") { "%02x".format(it) }
