@@ -123,7 +123,7 @@ fun WallpaperSlots(toast: (String) -> Unit) {
             PanelDivider()
         }
         SwitchRow("Different wallpapers for day and night", dayNight, { dayNight = it; WpConfig.setDayNight(context, it); if (it) DayNight.takeOver(context); tick++ },
-            subtitle = if (dayNight) "Day from $dayH:00, night from $nightH:00" else "Same wallpaper all day", icon = WonderIcons.NightsStay, tint = Color(0xFF5B4BC4))
+            subtitle = if (dayNight) "Day from $dayH:00, night from $nightH:00" else "Same wallpaper all day", icon = WonderIcons.NightsStay, tint = Color(0xFF5B4BC4), help = "Uses one wallpaper by day and another at night, switching at your real sunrise and sunset.")
         PanelDivider()
         if (dayNight) {
             card("Daytime", WonderIcons.WbSunny, Color(0xFFE39A12), "day") {

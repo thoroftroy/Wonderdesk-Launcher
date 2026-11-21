@@ -42,7 +42,7 @@ fun AssistSettingsPanel(needAccess: () -> Unit) {
     var chosen by remember { mutableStateOf(AssistActions.chosen(context)) }
     val hidden = AssistState.hidden
     Panel(title = "Floating button", footer = "A button that floats over every app, like Assistive Touch. Drag it anywhere, tap it for shortcuts. It uses the accessibility switch, and only presses buttons you choose; it reads nothing on screen. While the screen is being recorded it draws nothing, so it never appears in a recording.") {
-        SwitchRow("Floating button", on, { v -> on = v; AssistActions.setEnabled(context, v); if (v && LockService.instance == null) needAccess() }, icon = WonderIcons.TouchApp, tint = Color(0xFF1E7FE8))
+        SwitchRow("Floating button", on, { v -> on = v; AssistActions.setEnabled(context, v); if (v && LockService.instance == null) needAccess() }, icon = WonderIcons.TouchApp, tint = Color(0xFF1E7FE8), help = "A small button that floats over every app. Tap it for shortcuts like screenshots, recording and notes. It needs the Wonderdesk accessibility switch.")
         if (on) {
             PanelDivider()
             SwitchRow("Visible right now", !hidden, { v -> AssistState.hidden = !v; LockService.instance?.refreshButton() }, subtitle = "Bring it back any time from the Floating button tile in Quick Settings, or the Wonderdesk icon's long-press shortcut", icon = WonderIcons.Visibility, tint = Color(0xFF16A085))
@@ -78,7 +78,7 @@ fun AssistSettingsPanel(needAccess: () -> Unit) {
             var recClip by remember { mutableStateOf(AssistActions.recClip(context)) }
             SwitchRow("Record starts in clip mode", recClip, { recClip = it; AssistActions.set(context, "recClip", it) }, subtitle = "Tapping Record starts Cinema straight away with no prompts, silently keeping the last few seconds. Start a clip, save it or stop from the button's menu. Off: a normal full recording", icon = WonderIcons.Videocam, tint = Color(0xFFE5483C))
             PanelDivider()
-            SwitchRow("Hide while recording", hideRec, { hideRec = it; AssistActions.set(context, "hideRec2", it) }, subtitle = "Off: the button stays on screen and usable while recording, so you can start and save clips, but it will be in the video. On: it draws nothing while recording (a tap in the same spot still opens the menu)", icon = WonderIcons.Videocam, tint = Color(0xFFE5483C))
+            SwitchRow("Hide while recording", hideRec, { hideRec = it; AssistActions.set(context, "hideRec2", it) }, subtitle = "Off: the button stays on screen and usable while recording, so you can start and save clips, but it will be in the video. On: it draws nothing while recording (a tap in the same spot still opens the menu)", icon = WonderIcons.Videocam, tint = Color(0xFFE5483C), help = "Off keeps the button visible while you record, so you can still tap it. Turn on to hide it during recordings.")
             PanelDivider()
             var cards by remember { mutableStateOf(AssistCards.enabled(context)) }
             SwitchRow("Show app controls", cards, { cards = it; AssistCards.setEnabled(context, it); if (!it) AssistCards.list.clear() }, subtitle = "Apps that have a control notification (Bliss Player's playback, Wayfinder's sharing and file jobs, Ripple's connection, Cinema's recording) also put it at the top of this menu. Their notifications stay as they are, so nothing changes for anyone not using the button. Choose per app in Control Room", icon = WonderIcons.Notifications, tint = Color(0xFFE5483C))

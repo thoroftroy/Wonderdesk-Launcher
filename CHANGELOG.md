@@ -1,5 +1,10 @@
 # Launcher changelog
 
+## v0.10.1
+
+- Every app window now has the animated scene behind it, in the app's own colour (for example orange water in Abacus, green in Pulse, purple in Scribble), following your Aqua, Bliss or Super look and the real sunrise and sunset. Motion Reduced shows a still picture and Off turns it off
+- Help buttons (?) explain the more confusing settings
+
 ## v0.10.0
 
 - Floating button notifications are now grouped by app with Show all, Hide and Clear, scroll instead of filling the screen, can be swiped or crossed away, have Clear all, and old ones expire after ten minutes

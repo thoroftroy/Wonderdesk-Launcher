@@ -1590,9 +1590,9 @@ private fun Welcome(activity: MainActivity, onMore: () -> Unit, onWallpaper: () 
                     SwitchRow("Date in the menu bar", s.barDate, { set(s.copy(barDate = it)) }); PanelDivider()
                     SwitchRow("Clock in the menu bar", s.barTime, { set(s.copy(barTime = it)) }); PanelDivider()
                 }
-                SwitchRow("Full screen", s.fullscreen, { set(s.copy(fullscreen = it)); (context as? MainActivity)?.applyFullscreen() }, subtitle = "Hides the status bar on the home screen (the Back, Home and Recents buttons stay); swipe from the top to peek. The menu bar replaces the status bar while it is on"); PanelDivider()
-                SwitchRow("Allow home screen rotation", s.rotate, { set(s.copy(rotate = it)); (context as? MainActivity)?.applyRotation() }, subtitle = "Off keeps the home screen upright when you turn the phone; apps still rotate"); PanelDivider()
-                SwitchRow("Endless page scrolling", s.infinite, { set(s.copy(infinite = it)) }); PanelDivider()
+                SwitchRow("Full screen", s.fullscreen, { set(s.copy(fullscreen = it)); (context as? MainActivity)?.applyFullscreen() }, subtitle = "Hides the status bar on the home screen (the Back, Home and Recents buttons stay); swipe from the top to peek. The menu bar replaces the status bar while it is on", help = "Hides Android's status bar so the home screen uses the whole display."); PanelDivider()
+                SwitchRow("Allow home screen rotation", s.rotate, { set(s.copy(rotate = it)); (context as? MainActivity)?.applyRotation() }, subtitle = "Off keeps the home screen upright when you turn the phone; apps still rotate", help = "Off keeps your home screen upright when you turn the phone. Apps still rotate normally."); PanelDivider()
+                SwitchRow("Endless page scrolling", s.infinite, { set(s.copy(infinite = it)) }, help = "When on, swiping past the last home page takes you back to the first one."); PanelDivider()
                 ListRow("Choose a wallpaper", subtitle = "Wonderdesk's Aqua wallpapers or a photo", icon = WonderIcons.Wallpaper, tint = Color(0xFF8E44AD), chevron = true, onClick = onWallpaper)
             }
             SwitchRow("Ask again when Wonderdesk isn't the home app", s.askDefault, { set(s.copy(askDefault = it)) })
@@ -1678,10 +1678,10 @@ private fun LauncherSettings(onClose: () -> Unit, onWallpaper: () -> Unit) {
                     BarControls(s) { set(it) }
                 }
                 PanelDivider(0.dp)
-                SwitchRow("Allow home screen rotation", s.rotate, { set(s.copy(rotate = it)); (context as? MainActivity)?.applyRotation() }, subtitle = "Off keeps the home screen upright when you turn the phone; apps still rotate"); PanelDivider()
-                SwitchRow("Endless page scrolling", s.infinite, { set(s.copy(infinite = it)) }, subtitle = "Swiping past the last page goes back to the first"); PanelDivider()
+                SwitchRow("Allow home screen rotation", s.rotate, { set(s.copy(rotate = it)); (context as? MainActivity)?.applyRotation() }, subtitle = "Off keeps the home screen upright when you turn the phone; apps still rotate", help = "Off keeps your home screen upright when you turn the phone. Apps still rotate normally."); PanelDivider()
+                SwitchRow("Endless page scrolling", s.infinite, { set(s.copy(infinite = it)) }, subtitle = "Swiping past the last page goes back to the first", help = "When on, swiping past the last home page takes you back to the first one."); PanelDivider()
                 SwitchRow("Show app names", s.labels, { set(s.copy(labels = it)) }); PanelDivider()
-                SwitchRow("Dark names (for light wallpapers)", s.darkLabels, { set(s.copy(darkLabels = it)) }); PanelDivider()
+                SwitchRow("Dark names (for light wallpapers)", s.darkLabels, { set(s.copy(darkLabels = it)) }, help = "Uses dark app names so they stay readable on a bright wallpaper."); PanelDivider()
                 Column(Modifier.padding(16.dp, 10.dp)) { Text("Dock icon size: ${s.dockPct}%", style = MaterialTheme.typography.titleSmall); Slider(s.dockPct.toFloat(), { set(s.copy(dockPct = it.toInt())) }, valueRange = 60f..140f) }
                 PanelDivider()
                 Column(Modifier.padding(16.dp, 10.dp)) { Text("App name size: ${s.labelPct}%", style = MaterialTheme.typography.titleSmall); Slider(s.labelPct.toFloat(), { set(s.copy(labelPct = it.toInt())) }, valueRange = 70f..160f) }
@@ -1715,8 +1715,8 @@ private fun LauncherSettings(onClose: () -> Unit, onWallpaper: () -> Unit) {
                     DropdownMenu(sortOpen, { sortOpen = false }) { SORTS.forEach { (id, n) -> DropdownMenuItem({ Text(n) }, { sortOpen = false; set(s.copy(launchpadSort = id)) }) } }
                 }
                 PanelDivider()
-                SwitchRow("Folders first", s.lpFoldersFirst, { set(s.copy(lpFoldersFirst = it)) }); PanelDivider()
-                ListRow("Hidden apps", subtitle = "${Home.hidden.size} hidden", icon = WonderIcons.VisibilityOff, tint = Color(0xFF7A7F87), chevron = true, onClick = { hiddenOpen = true })
+                SwitchRow("Folders first", s.lpFoldersFirst, { set(s.copy(lpFoldersFirst = it)) }, help = "Shows folders before apps in the all-apps screen."); PanelDivider()
+                ListRow("Hidden apps", subtitle = "${Home.hidden.size} hidden", icon = WonderIcons.VisibilityOff, tint = Color(0xFF7A7F87), chevron = true, onClick = { hiddenOpen = true }, help = "Apps you hide here disappear from Beacon and the home screen but stay installed.")
             }
                 }
                 "button" -> {
