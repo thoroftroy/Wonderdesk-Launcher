@@ -176,8 +176,24 @@ object Home {
     }
 
     /** Cheap check on resume: reload if any app was installed, removed or updated (icons refresh themselves). */
+    /** An uninstalled app disappears at once: its icons are dropped from every screen before the full reload even starts. */
+    fun pruneUninstalled(c: Context, onlyPackage: String? = null) {
+        val pm = c.packageManager
+        val gone = apps.map { it.pkg }.distinct().filter { p -> if (onlyPackage != null) p == onlyPackage && !installed(pm, p) else !installed(pm, p) }.toSet()
+        if (gone.isEmpty()) return
+        apps = apps.filter { it.pkg !in gone }; byKey = apps.associateBy { it.key }
+        val keys = byKey.keys
+        items = items.mapNotNull { when (it) { is Item.Shortcut -> it.takeIf { s -> s.app in keys }; is Item.Folder -> it.copy(apps = it.apps.filter { a -> a in keys }).takeIf { f -> f.apps.isNotEmpty() }; else -> it } }
+        dock = dock.filter { it in keys }
+        groups = groups.map { g -> g.copy(apps = g.apps.filter { it in keys }) }.filter { it.apps.isNotEmpty() }
+        save(c.applicationContext)
+        loadApps(c)
+    }
+    private fun installed(pm: android.content.pm.PackageManager, p: String) = runCatching { pm.getApplicationInfo(p, 0); true }.getOrDefault(false)
+
     fun refreshIfChanged(c: Context) {
-        if (System.currentTimeMillis() - lastCheck < 15_000) return
+        pruneUninstalled(c)
+        if (System.currentTimeMillis() - lastCheck < 3_000) return
         lastCheck = System.currentTimeMillis()
         scope.launch {
             val changed = withContext(Dispatchers.Default) {

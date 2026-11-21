@@ -121,7 +121,7 @@ class MainActivity : ComponentActivity() {
     lateinit var host: WdWidgetHost
     private val callback = object : LauncherApps.Callback() {
         private fun refresh() = runOnUiThread { Home.loadApps(this@MainActivity) }
-        override fun onPackageRemoved(p: String, u: UserHandle) = refresh()
+        override fun onPackageRemoved(p: String, u: UserHandle) { runOnUiThread { Home.pruneUninstalled(this@MainActivity, p) }; refresh() }
         override fun onPackageAdded(p: String, u: UserHandle) = refresh()
         override fun onPackageChanged(p: String, u: UserHandle) = refresh()
         override fun onPackagesAvailable(p: Array<out String>, u: UserHandle, r: Boolean) = refresh()
