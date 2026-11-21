@@ -65,7 +65,7 @@ import dev.wonderdesk.shared.*
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
-/** What the recorder is doing, as Cinema last told us. */
+/** What the recorder is doing, as Memories last told us. */
 object AssistState {
     var recording by mutableStateOf(false)
     var clipMode by mutableStateOf(false)
@@ -80,7 +80,7 @@ data class AssistAct(val id: String, val label: String, val icon: ImageVector?, 
 /** Everything about the floating button that can be changed, and what each shortcut does. */
 object AssistActions {
     private val APPS = listOf("Beacon" to "dev.wonderdesk.beacon", "Polaris" to "dev.wonderdesk.polaris", "Scribble" to "dev.wonderdesk.scribble", "Chronicle" to "dev.wonderdesk.chronicle",
-        "Timepiece" to "dev.wonderdesk.timepiece", "Memories" to "dev.wonderdesk.memories", "Cinema" to "dev.wonderdesk.cinema", "Ripple" to "dev.wonderdesk.ripple", "Vault" to "dev.wonderdesk.vault",
+        "Timepiece" to "dev.wonderdesk.timepiece", "Memories" to "dev.wonderdesk.memories", "Ripple" to "dev.wonderdesk.ripple", "Vault" to "dev.wonderdesk.vault",
         "Control Room" to "dev.wonderdesk.controlroom", "Wayfinder" to "dev.wonderdesk.wayfinder", "Pages" to "dev.wonderdesk.pages", "Packrat" to "dev.wonderdesk.packrat", "Abacus" to "dev.wonderdesk.abacus",
         "Pulse" to "dev.wonderdesk.pulse", "Safekeeper" to "dev.wonderdesk.safekeeper", "Echo" to "dev.wonderdesk.echo", "Apphub" to "dev.wonderdesk.apphub", "Bliss Player" to "com.blissplayer.music.debug")
 
@@ -134,8 +134,8 @@ object AssistActions {
     /** Which shortcuts to show right now: the recording ones change with what the recorder is doing. */
     fun live(c: Context): List<AssistAct> = chosen(c).mapNotNull { id ->
         val a = byId(id) ?: return@mapNotNull null
-        // Cinema puts its own card (Start clip, Save clip, Stop) at the top while recording, so its tiles would just repeat it.
-        if ((id == "rec" || id == "clip") && AssistState.recording && AssistCards.list.any { it.key == "cinema" }) return@mapNotNull null
+        // Memories puts its own card (Start clip, Save clip, Stop) at the top while recording, so its tiles would just repeat it.
+        if ((id == "rec" || id == "clip") && AssistState.recording && AssistCards.list.any { it.key == "memories" }) return@mapNotNull null
         when (id) {
             "rec" -> if (AssistState.recording && !AssistState.clipMode) a.copy(label = "Stop", icon = WonderIcons.Stop) else if (AssistState.recording) a.copy(label = "Clips off", icon = WonderIcons.Stop) else a
             "clip" -> if (!AssistState.recording || !AssistState.clipMode) null else if (AssistState.writing) a.copy(label = "Save clip") else a.copy(label = "Start clip")
@@ -148,7 +148,7 @@ object AssistActions {
         runCatching { s.startActivity(Intent().setClassName("dev.wonderdesk.ripple", "dev.wonderdesk.ripple.QuickNoteActivity").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION)) }
     }
 
-    private fun toCinema(s: AccessibilityService, action: String) { s.sendBroadcast(Intent(action).setPackage("dev.wonderdesk.cinema"), "dev.wonderdesk.cinema.CONTROL") }
+    private fun toCinema(s: AccessibilityService, action: String) { s.sendBroadcast(Intent(action).setPackage("dev.wonderdesk.memories"), "dev.wonderdesk.memories.CONTROL") }
 
     private fun openApp(s: Context, pkg: String, extra: Intent.() -> Unit = {}) {
         val la = s.getSystemService(android.content.pm.LauncherApps::class.java)
@@ -175,7 +175,7 @@ object AssistActions {
             id == "rec" -> if (AssistState.recording) toCinema(s, RecorderBridge.STOP) else {
                 // No prompts: the accessibility service presses Start on Android's screen-capture permission for the next few seconds.
                 AutoConfirm.arm()
-                runCatching { s.startActivity(Intent().setClassName("dev.wonderdesk.cinema", "dev.wonderdesk.cinema.RecordActivity").putExtra("clip", recClip(s)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION)) }
+                runCatching { s.startActivity(Intent().setClassName("dev.wonderdesk.memories", "dev.wonderdesk.cinema.RecordActivity").putExtra("clip", recClip(s)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION)) }
             }
             id == "clip" -> if (AssistState.writing) toCinema(s, RecorderBridge.SAVE_CLIP) else toCinema(s, RecorderBridge.CLIP)
             id == "newnote" -> if (noteTarget(s) == "ripple") quickRippleNote(s) else openApp(s, "dev.wonderdesk.scribble") { putExtra("new", true) }
@@ -198,12 +198,12 @@ object AutoConfirm {
     fun active() = System.currentTimeMillis() < until
 }
 
-/** The names of Cinema's remote controls (kept in step with Cinema's RecorderControl). */
+/** The names of the screen recorder's remote controls in Memories (kept in step with its RecorderControl). */
 object RecorderBridge {
-    const val STATE = "dev.wonderdesk.cinema.REC_STATE"
-    const val CLIP = "dev.wonderdesk.cinema.CTL_CLIP"
-    const val SAVE_CLIP = "dev.wonderdesk.cinema.CTL_SAVE_CLIP"
-    const val STOP = "dev.wonderdesk.cinema.CTL_STOP"
+    const val STATE = "dev.wonderdesk.memories.REC_STATE"
+    const val CLIP = "dev.wonderdesk.memories.CTL_CLIP"
+    const val SAVE_CLIP = "dev.wonderdesk.memories.CTL_SAVE_CLIP"
+    const val STOP = "dev.wonderdesk.memories.CTL_STOP"
 }
 
 /** Lifecycle plumbing so Compose can live in a window the accessibility service owns. */
@@ -260,7 +260,7 @@ class FloatingButton(private val s: AccessibilityService) {
         runCatching { s.sendBroadcast(Intent("dev.wonderdesk.assist.REFRESH").setPackage("dev.wonderdesk.ripple")) }
     }
 
-    /** Recording state comes from Cinema; the button hides itself from the recording while it runs. */
+    /** Recording state comes from Memories; the button hides itself from the recording while it runs. */
     private fun listenToRecorder() {
         if (receiver != null) return
         receiver = object : BroadcastReceiver() {

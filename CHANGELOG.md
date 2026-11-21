@@ -1,5 +1,9 @@
 # Launcher changelog
 
+## v0.10.4
+
+- The floating button's Record, Start clip, Save clip and Stop now control the screen recorder inside Memories (Cinema has been merged into it)
+
 ## v0.10.3
 
 - At night the animated background gets a stronger wash, so text stays easy to read on dark scenes

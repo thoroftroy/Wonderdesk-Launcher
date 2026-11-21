@@ -1,7 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.EXPAND_STATUS_BAR" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <uses-permission android:name="dev.wonderdesk.cinema.CONTROL" />
+    <uses-permission android:name="dev.wonderdesk.memories.CONTROL" />
     <uses-permission android:name="dev.wonderdesk.ripple.QUICK" />
     <uses-permission android:name="android.permission.SET_WALLPAPER" />
     <!-- Needed for the Uninstall action (Android asks the user to confirm every time). -->
