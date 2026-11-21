@@ -1,5 +1,9 @@
 # Launcher changelog
 
+## v0.10.5
+
+- An app you uninstall disappears from the home screen, Dock and folders straight away, instead of lingering until a refresh
+
 ## v0.10.4
 
 - The floating button's Record, Start clip, Save clip and Stop now control the screen recorder inside Memories (Cinema has been merged into it)
