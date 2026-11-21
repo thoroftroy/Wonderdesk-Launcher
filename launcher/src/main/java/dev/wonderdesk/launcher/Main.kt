@@ -187,6 +187,8 @@ class LockService : AccessibilityService() {
     private var floating: FloatingButton? = null
     override fun onServiceConnected() { instance = this; refreshButton() }
     /** Shows or hides the floating assist button to match its setting. */
+    /** The power-button assistant gesture: open the floating button's menu. */
+    fun openAssistMenu() { if (floating == null && AssistActions.enabled(this)) refreshButton(); floating?.openMenuNow() }
     fun refreshButton() {
         floating?.destroy(); floating = null
         if (AssistActions.enabled(this)) floating = FloatingButton(this).also { it.show() }
@@ -1745,3 +1747,18 @@ private fun LauncherSettings(onClose: () -> Unit, onWallpaper: () -> Unit) {
 }
 
 private fun gestureName(g: String) = when (g) { "launchpad", "beacon" -> "Open Beacon (all apps)"; "search" -> "Search with Beacon"; "notifications" -> "Show notifications"; "lock" -> "Lock screen"; else -> "Nothing" }
+
+
+/**
+ * Lets the Launcher be chosen as the phone's "digital assistant" (Settings > Apps > Default apps > Digital assistant app).
+ * Then the power-button long-press (or the assistant swipe) opens the floating button's menu instead of Google's assistant.
+ */
+class AssistEntryActivity : android.app.Activity() {
+    override fun onCreate(savedInstanceState: android.os.Bundle?) {
+        super.onCreate(savedInstanceState)
+        val svc = LockService.instance
+        if (svc != null && AssistActions.enabled(this)) svc.openAssistMenu()
+        else startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))   // the floating button is off: just go home
+        finish()
+    }
+}

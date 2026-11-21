@@ -1,5 +1,10 @@
 # Launcher changelog
 
+## v0.10.6
+
+- The animated background is now drawn directly on the screen at full sharpness instead of a small picture stretched up, so it is smooth and no longer looks pixelated; the grain over it is much subtler, and long tab names (like Feedback) shrink to fit instead of being cut off
+- Choose Wonderdesk Launcher as the Digital assistant app and the power-button hold opens the floating button's menu instead of Google's assistant (Floating button settings, Open with the power button)
+
 ## v0.10.5
 
 - An app you uninstall disappears from the home screen, Dock and folders straight away, instead of lingering until a refresh

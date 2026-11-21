@@ -317,6 +317,12 @@ class FloatingButton(private val s: AccessibilityService) {
         runCatching { wm.addView(v, p) }.onSuccess { panelView = v; panelParams = p }
     }
 
+    /** Opens the button's menu from outside (the power-button assistant gesture), showing the button first if it was hidden. */
+    fun openMenuNow() {
+        if (buttonParams == null || buttonView == null) { AssistState.hidden = false; show() }
+        buttonParams?.let { bp -> handler.post { openPanel(bp) } }
+    }
+
     private fun openPanel(bp: WindowManager.LayoutParams) {
         val v = panelView ?: return; val p = panelParams ?: return
         handler.removeCallbacksAndMessages(null)

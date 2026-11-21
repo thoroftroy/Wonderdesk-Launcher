@@ -47,6 +47,9 @@ fun AssistSettingsPanel(needAccess: () -> Unit) {
             PanelDivider()
             SwitchRow("Visible right now", !hidden, { v -> AssistState.hidden = !v; LockService.instance?.refreshButton() }, subtitle = "Bring it back any time from the Floating button tile in Quick Settings, or the Wonderdesk icon's long-press shortcut", icon = WonderIcons.Visibility, tint = Color(0xFF16A085))
             PanelDivider()
+            ListRow("Open with the power button", subtitle = "Choose Wonderdesk Launcher as the Digital assistant app. Then holding the power button (or the assistant swipe) opens this menu instead of Google's assistant", icon = WonderIcons.TouchApp, tint = Color(0xFF1E7FE8), chevron = true,
+                onClick = { runCatching { context.startActivity(android.content.Intent(android.provider.Settings.ACTION_VOICE_INPUT_SETTINGS).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }.onFailure { runCatching { context.startActivity(android.content.Intent(android.provider.Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) } } })
+            PanelDivider()
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Menu colour", style = MaterialTheme.typography.titleSmall)
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
