@@ -112,6 +112,11 @@ object AssistActions {
     fun snap(c: Context) = prefs(c).getBoolean("snap", false)
     /** Off by default: Android has no way to leave one overlay out of a recording, so hiding it only means you cannot see your own Clip button. A new key, so an old saved choice does not carry over. */
     fun hideWhileRecording(c: Context) = prefs(c).getBoolean("hideRec2", false)
+    /** With the Launcher as the phone's digital assistant: the button keeps out of sight and only comes up with the menu when you hold the power button. */
+    fun powerOnly(c: Context) = prefs(c).getBoolean("powerOnly", true)
+    /** Is the Launcher the chosen Digital assistant app (so holding the power button opens this menu)? */
+    fun isAssistant(c: Context) = runCatching { android.provider.Settings.Secure.getString(c.contentResolver, "assistant").orEmpty().startsWith(c.packageName + "/") }.getOrDefault(false)
+    fun powerOnlyActive(c: Context) = powerOnly(c) && isAssistant(c)
     fun accentId(c: Context) = prefs(c).getString("accent", "look") ?: "look"
     fun gesture(c: Context, k: String) = prefs(c).getString("g_$k", when (k) { "tap" -> "menu"; "long" -> "hide"; else -> "none" }) ?: "none"
     fun set(c: Context, key: String, v: Any) { prefs(c).edit().apply { when (v) { is Boolean -> putBoolean(key, v); is Int -> putInt(key, v); is String -> putString(key, v) } }.apply(); LockService.instance?.refreshButton() }
@@ -319,6 +324,8 @@ class FloatingButton(private val s: AccessibilityService) {
 
     /** Opens the button's menu from outside (the power-button assistant gesture), showing the button first if it was hidden. */
     fun openMenuNow() {
+        // Brought up by the power button: once you are done with the menu it goes away again by itself.
+        summoned = AssistActions.powerOnlyActive(s)
         if (buttonParams == null || buttonView == null) { AssistState.hidden = false; show() }
         buttonParams?.let { bp -> handler.post { openPanel(bp) } }
     }
@@ -333,8 +340,17 @@ class FloatingButton(private val s: AccessibilityService) {
         panelOpen.value = true
     }
 
+    /** The menu was opened by the power button and the button should leave with it. */
+    private var summoned = false
+
     private fun closePanel() {
         panelOpen.value = false
+        if (summoned) {
+            summoned = false
+            // After the closing animation and the chosen shortcut have run.
+            handler.postDelayed({ AssistState.hidden = true; LockService.instance?.refreshButton() }, 420)
+            return
+        }
         // Let the closing animation finish, then shrink the window back so it can't catch touches.
         handler.postDelayed({
             val v = panelView ?: return@postDelayed; val p = panelParams ?: return@postDelayed

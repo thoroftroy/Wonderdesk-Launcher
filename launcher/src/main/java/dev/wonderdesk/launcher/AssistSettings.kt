@@ -41,13 +41,23 @@ fun AssistSettingsPanel(needAccess: () -> Unit) {
     var accent by remember { mutableStateOf(AssistActions.accentId(context)) }
     var chosen by remember { mutableStateOf(AssistActions.chosen(context)) }
     val hidden = AssistState.hidden
+    var powerOnly by remember { mutableStateOf(AssistActions.powerOnly(context)) }
+    // Checked again each time you come back from Android's settings.
+    val resumed = rememberIsResumed()
+    val isAssistant = remember(resumed) { AssistActions.isAssistant(context) }
     Panel(title = "Floating button", footer = "A button that floats over every app, like Assistive Touch. Drag it anywhere, tap it for shortcuts. It uses the accessibility switch, and only presses buttons you choose; it reads nothing on screen. While the screen is being recorded it draws nothing, so it never appears in a recording.") {
         SwitchRow("Floating button", on, { v -> on = v; AssistActions.setEnabled(context, v); if (v && LockService.instance == null) needAccess() }, icon = WonderIcons.TouchApp, tint = Color(0xFF1E7FE8), help = "A small button that floats over every app. Tap it for shortcuts like screenshots, recording and notes. It needs the Wonderdesk accessibility switch.")
         if (on) {
             PanelDivider()
             SwitchRow("Visible right now", !hidden, { v -> AssistState.hidden = !v; LockService.instance?.refreshButton() }, subtitle = "Bring it back any time from the Floating button tile in Quick Settings, or the Wonderdesk icon's long-press shortcut", icon = WonderIcons.Visibility, tint = Color(0xFF16A085))
             PanelDivider()
-            ListRow("Open with the power button", subtitle = "Choose Wonderdesk Launcher as the Digital assistant app. Then holding the power button (or the assistant swipe) opens this menu instead of Google's assistant", icon = WonderIcons.TouchApp, tint = Color(0xFF1E7FE8), chevron = true,
+            if (isAssistant) {
+                SwitchRow("Only with the power button", powerOnly, { v -> powerOnly = v; AssistActions.set(context, "powerOnly", v); if (v) { AssistState.hidden = true; LockService.instance?.refreshButton() } },
+                    subtitle = if (powerOnly) "Hold the power button and the menu comes up; tap a shortcut or tap away and it goes again. The button stays out of sight the rest of the time"
+                    else "The button stays on screen; holding the power button also opens its menu", icon = WonderIcons.Bolt, tint = Color(0xFFE8831E))
+                PanelDivider()
+            }
+            ListRow(if (isAssistant) "Power button: Wonderdesk Launcher" else "Open with the power button", subtitle = if (isAssistant) "Holding the power button (or the assistant swipe) opens this menu. Tap to change the Digital assistant app" else "Choose Wonderdesk Launcher as the Digital assistant app. Then holding the power button (or the assistant swipe) opens this menu instead of Google's assistant", icon = WonderIcons.TouchApp, tint = Color(0xFF1E7FE8), chevron = true,
                 onClick = { runCatching { context.startActivity(android.content.Intent(android.provider.Settings.ACTION_VOICE_INPUT_SETTINGS).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }.onFailure { runCatching { context.startActivity(android.content.Intent(android.provider.Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) } } })
             PanelDivider()
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

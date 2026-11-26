@@ -185,7 +185,7 @@ class MainActivity : ComponentActivity() {
 /** Optional: lets the launcher lock the screen with a gesture. */
 class LockService : AccessibilityService() {
     private var floating: FloatingButton? = null
-    override fun onServiceConnected() { instance = this; refreshButton() }
+    override fun onServiceConnected() { instance = this; if (AssistActions.powerOnlyActive(this)) AssistState.hidden = true; refreshButton() }
     /** Shows or hides the floating assist button to match its setting. */
     /** The power-button assistant gesture: open the floating button's menu. */
     fun openAssistMenu() { if (floating == null && AssistActions.enabled(this)) refreshButton(); floating?.openMenuNow() }
