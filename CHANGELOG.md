@@ -2,6 +2,8 @@
 
 ## v0.11.0
 
+- The floating button has a Passwords shortcut: it opens Vault's quick look, with the logins for the app you are in first. It is added once after Search to a menu you already set up
+- The background answers your finger: a tap sends rings out and pops what it lands on, and dragging or scrolling leaves a wake and stirs the scene. Saving, adding, deleting and finishing things send a wave of colour through it, and an error gives a red shudder
 - With the floating button set as the digital assistant (hold the power button), it now stays out of sight until you call it and hides itself again when you tap away or pick a shortcut, so you never have to press Hide
 - The Aqua wallpaper changes far more through the day: a rose dawn, gold sunrise, turquoise morning, deep azure noon with short bright rays, a warm afternoon with rays leaning the other way, an orange sunset, violet dusk and a real night with almost black water, the moon shimmering through the surface, one pale moonbeam and glowing plankton. Now and then a cloud drifts over and the light dims
 - The Super wallpaper's space follows the day as well: dark at night with brighter stars, rose at dawn, teal in the morning, cobalt at noon, violet in the afternoon and red and amber at sunset
