@@ -3,6 +3,7 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="dev.wonderdesk.memories.CONTROL" />
     <uses-permission android:name="dev.wonderdesk.ripple.QUICK" />
+    <uses-permission android:name="dev.wonderdesk.vault.LOGINS" />
     <uses-permission android:name="android.permission.SET_WALLPAPER" />
     <!-- Needed for the Uninstall action (Android asks the user to confirm every time). -->
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />

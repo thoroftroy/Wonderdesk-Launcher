@@ -1,5 +1,13 @@
 # Launcher changelog
 
+## v0.11.0
+
+- With the floating button set as the digital assistant (hold the power button), it now stays out of sight until you call it and hides itself again when you tap away or pick a shortcut, so you never have to press Hide
+- The Aqua wallpaper changes far more through the day: a rose dawn, gold sunrise, turquoise morning, deep azure noon with short bright rays, a warm afternoon with rays leaning the other way, an orange sunset, violet dusk and a real night with almost black water, the moon shimmering through the surface, one pale moonbeam and glowing plankton. Now and then a cloud drifts over and the light dims
+- The Super wallpaper's space follows the day as well: dark at night with brighter stars, rose at dawn, teal in the morning, cobalt at noon, violet in the afternoon and red and amber at sunset
+- The full screen wallpaper preview's time slider now really changes the scene (it only changed the label before)
+- Opening the app no longer sprays a burst of fast symbols across the background; celebrations are a gentle lift of a few symbols, and only for something you just did
+
 ## v0.10.8
 
 - Internal update to the shared animated background (it can now follow what each app is doing); nothing changes in the Launcher itself

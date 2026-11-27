@@ -92,13 +92,13 @@ object AssistActions {
             AssistAct("volup", "Vol up", WonderIcons.VolumeUp, "System"), AssistAct("voldown", "Vol down", WonderIcons.VolumeOff, "System"),
             AssistAct("rec", "Record", WonderIcons.Videocam, "Recording"), AssistAct("clip", "Clip", WonderIcons.ContentCut, "Recording"),
             AssistAct("newnote", "New note", WonderIcons.NoteAdd, "Quick"), AssistAct("newevent", "New event", WonderIcons.Event, "Quick"), AssistAct("search", "Search", WonderIcons.Search, "Quick"),
-            AssistAct("hide", "Hide", WonderIcons.VisibilityOff, "Quick"),
+            AssistAct("hide", "Hide", WonderIcons.VisibilityOff, "Quick"), AssistAct("vault", "Passwords", WonderIcons.Key, "Quick"),
             AssistAct("ripplenote", "Ripple note", WonderIcons.NoteAdd, "Ripple"), AssistAct("ripplenotes", "Notepads", WonderIcons.Notes, "Ripple"),
             AssistAct("ripplefiles", "Files", WonderIcons.Folder, "Ripple"), AssistAct("ripplewake", "Wake PC", WonderIcons.Bolt, "Ripple"),
         ) + APPS.map { (n, p) -> AssistAct("app:$p", n, null, "Apps", p) }
     }
     fun byId(id: String) = CATALOG.firstOrNull { it.id == id }
-    val DEFAULT = listOf("rec", "clip", "screenshot", "newnote", "search", "app:dev.wonderdesk.beacon", "notifications", "lock", "hide")
+    val DEFAULT = listOf("rec", "clip", "screenshot", "newnote", "search", "vault", "app:dev.wonderdesk.beacon", "notifications", "lock", "hide")
     /** What a tap, double tap or long press on the button itself can do. */
     val GESTURES = listOf("menu" to "Open the menu", "hide" to "Hide the button", "home" to "Home", "back" to "Back", "recents" to "Recents", "screenshot" to "Screenshot", "rec" to "Record or stop", "lock" to "Lock", "none" to "Nothing")
     val ACCENTS = listOf("look" to "Match my look", "blue" to "Blue", "green" to "Green", "purple" to "Purple", "orange" to "Orange", "red" to "Red", "graphite" to "Graphite")
@@ -128,6 +128,14 @@ object AssistActions {
         // The menu changed a lot (Home and Back went, Record leads). Everyone starts from the new default once, so an old saved list can
         // never leave it without Record or empty; after that your own choices are kept.
         if (prefs(c).getInt("actionsV", 1) < 3) prefs(c).edit().remove("actions").putInt("actionsV", 3).apply()
+        // Passwords came later: added once to a list you already set up, after Search (you can take it out again).
+        if (prefs(c).getInt("vaultAdded", 0) < 1) {
+            prefs(c).getString("actions", null)?.split(',')?.filter { it.isNotBlank() }?.takeIf { it.isNotEmpty() && "vault" !in it }?.let { l ->
+                val at = (l.indexOf("search").takeIf { it >= 0 } ?: (l.size - 1)) + 1
+                prefs(c).edit().putString("actions", (l.take(at) + "vault" + l.drop(at)).joinToString(",")).apply()
+            }
+            prefs(c).edit().putInt("vaultAdded", 1).apply()
+        }
         val saved = prefs(c).getString("actions", null)?.split(',')?.filter { it.isNotBlank() && byId(it) != null }.orEmpty()
         return saved.ifEmpty { DEFAULT }
     }
@@ -191,6 +199,14 @@ object AssistActions {
             id == "newevent" -> openApp(s, "dev.wonderdesk.chronicle") { putExtra("new", true) }
             id == "search" -> openApp(s, "dev.wonderdesk.beacon") { putExtra("search", true) }
             id == "hide" -> { AssistState.hidden = true; LockService.instance?.refreshButton() }
+            id == "vault" -> {
+                // Vault's quick look: unlock and copy a login without opening Vault. It is told which app you are in, so that app's logins come first.
+                val here = runCatching { s.windows.firstOrNull { it.type == android.view.accessibility.AccessibilityWindowInfo.TYPE_APPLICATION && it.isActive }?.root?.packageName?.toString() }.getOrNull()
+                    ?: runCatching { s.rootInActiveWindow?.packageName?.toString() }.getOrNull()
+                val pkg = here?.takeIf { it != s.packageName && it != "com.android.systemui" && it != "dev.wonderdesk.vault" }.orEmpty()
+                runCatching { s.startActivity(Intent().setClassName("dev.wonderdesk.vault", "dev.wonderdesk.vault.QuickLookActivity").putExtra("pkg", pkg)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION)) }.onFailure { openApp(s, "dev.wonderdesk.vault") }
+            }
         }
     }
 }

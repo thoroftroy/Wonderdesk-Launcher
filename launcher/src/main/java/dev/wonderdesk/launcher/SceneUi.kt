@@ -170,6 +170,8 @@ fun ScenePreview(id: String, onClose: () -> Unit) {
     var hour by androidx.compose.runtime.remember { androidx.compose.runtime.mutableFloatStateOf(-1f) }
     val base = androidx.compose.runtime.remember(id) { SceneConfig.resolve(context, id) }
     val cfg = androidx.compose.runtime.remember(base, hour) { base.copy(fixedHour = hour) }
+    // The drawing loop below starts once, so it reads the hour through this, or moving the slider would only change the label.
+    val liveCfg by androidx.compose.runtime.rememberUpdatedState(cfg)
     androidx.compose.ui.window.Dialog(onDismissRequest = onClose, properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black)) {
             androidx.compose.foundation.layout.BoxWithConstraints(androidx.compose.ui.Modifier.fillMaxSize()) {
@@ -184,11 +186,11 @@ fun ScenePreview(id: String, onClose: () -> Unit) {
                     while (true) androidx.compose.runtime.withFrameNanos { t ->
                         if (last == 0L) last = t
                         val dt = ((t - last) / 1e9f).coerceAtMost(.1f)
-                        if (dt >= 1f / 30f) { runner.update(dt, cfg, 100, false); runner.draw(canvas, cfg); last = t; frame++ }
+                        if (dt >= 1f / 30f) { runner.update(dt, liveCfg, 100, false); runner.draw(canvas, liveCfg); last = t; frame++ }
                     }
                 }
                 androidx.compose.foundation.Canvas(androidx.compose.ui.Modifier.fillMaxSize().pointerInput(runner) {
-                    detectTapGestures { o -> runner.tap(o.x / size.width * w, o.y / size.height * h, cfg) }
+                    detectTapGestures { o -> runner.tap(o.x / size.width * w, o.y / size.height * h, liveCfg) }
                 }) { frame; drawImage(bmp.asImageBitmap(), dstSize = androidx.compose.ui.unit.IntSize(size.width.toInt(), size.height.toInt()), filterQuality = androidx.compose.ui.graphics.FilterQuality.Medium) }
             }
             androidx.compose.foundation.layout.Column(androidx.compose.ui.Modifier.align(androidx.compose.ui.Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding().padding(16.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(18.dp)).background(androidx.compose.ui.graphics.Color(0x99000000)).padding(12.dp)) {

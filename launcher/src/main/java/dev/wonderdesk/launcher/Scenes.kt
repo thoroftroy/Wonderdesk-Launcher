@@ -285,7 +285,7 @@ class AquaScene(w: Int, h: Int) : Scene(w, h, 3) {
         src.set(0, 0, sunSprite.width, sunSprite.height)
         if (day > .02f) {
             val sx = w * (.5f + .44f * side); val r = m * (.38f + .42f * height)
-            glowPaint.colorFilter = tintFilter(rayColor); glowPaint.alpha = (day * cloud * (150f + 70f * height)).toInt().coerceIn(0, 255)
+            glowPaint.colorFilter = tintFilter(rayColor); glowPaint.alpha = (day * cloud * (105f + 35f * height)).toInt().coerceIn(0, 255)
             dst.set(sx - r, -r * .9f, sx + r, r * .55f); c.drawBitmap(sunSprite, src, dst, glowPaint)
         }
         if (night > .02f) {
@@ -309,7 +309,7 @@ class AquaScene(w: Int, h: Int) : Scene(w, h, 3) {
             sh.setLocalMatrix(mat); causticPaint.shader = sh
             val bands = 16
             for (i in 0 until bands) {
-                val f = i / bands.toFloat(); causticPaint.alpha = (92f * causticStrength * (1f - f) * (1f - f) * (if (layer == 0) 1f else .75f)).toInt().coerceIn(0, 255)
+                val f = i / bands.toFloat(); causticPaint.alpha = (74f * causticStrength * (1f - f) * (1f - f) * (if (layer == 0) 1f else .75f)).toInt().coerceIn(0, 255)
                 c.drawRect(0f, reach * f, w.toFloat(), reach * (i + 1) / bands + 1f, causticPaint)
             }
         }
@@ -323,7 +323,7 @@ class AquaScene(w: Int, h: Int) : Scene(w, h, 3) {
         rayPaint.colorFilter = tintFilter(rayColor)
         if (rays > .01f) for (bm in beams) {
             val x = w * bm.x + sin(time * .07f * bm.sp + bm.ph) * w * .06f - side * w * .08f
-            val a = (.4f + .6f * (sin(time * .22f * bm.sp + bm.ph) * .5f + .5f)) * rays * bm.str * (.36f + .2f * height)
+            val a = (.4f + .6f * (sin(time * .22f * bm.sp + bm.ph) * .5f + .5f)) * rays * bm.str * (.3f + .08f * height)
             val bw = w * bm.wd * (1.7f - .5f * height)
             val len = h * (1.25f - .3f * height)
             c.save(); c.translate(x, -m * .03f); c.rotate(lean + sin(time * .1f * bm.sp + bm.ph * 1.7f) * 5f)
@@ -367,12 +367,12 @@ private val AQUA_WATER = Keys(floatArrayOf(0f, 4.6f, 5.8f, 6.9f, 9f, 12.4f, 15.3
     arrayOf(
         intArrayOf(0xFF0B2552.toInt(), 0xFF06163A.toInt(), 0xFF01040F.toInt()),   // night: ink blue
         intArrayOf(0xFF1E2C66.toInt(), 0xFF111C4A.toInt(), 0xFF02061A.toInt()),   // before dawn
-        intArrayOf(0xFFF0A2BE.toInt(), 0xFF6060AE.toInt(), 0xFF111F58.toInt()),   // dawn: rose
-        intArrayOf(0xFFFFC98E.toInt(), 0xFF3F8ECB.toInt(), 0xFF0A3272.toInt()),   // sunrise: gold
-        intArrayOf(0xFFA2F4EE.toInt(), 0xFF16BAD6.toInt(), 0xFF06528E.toInt()),   // morning: turquoise
-        intArrayOf(0xFF86DCFF.toInt(), 0xFF0A8BEB.toInt(), 0xFF032E88.toInt()),   // noon: azure
-        intArrayOf(0xFFCFF2C4.toInt(), 0xFF2AA8B4.toInt(), 0xFF0B4076.toInt()),   // afternoon: warm, greener
-        intArrayOf(0xFFFFD680.toInt(), 0xFF4E9CB4.toInt(), 0xFF133F72.toInt()),   // golden hour
+        intArrayOf(0xFFC97A9E.toInt(), 0xFF5A58A6.toInt(), 0xFF111F58.toInt()),   // dawn: rose
+        intArrayOf(0xFFE0A66A.toInt(), 0xFF3F8ECB.toInt(), 0xFF0A3272.toInt()),   // sunrise: gold
+        intArrayOf(0xFF5FD2D2.toInt(), 0xFF139FC4.toInt(), 0xFF06528E.toInt()),   // morning: turquoise
+        intArrayOf(0xFF3FB0EE.toInt(), 0xFF0A78D6.toInt(), 0xFF032E88.toInt()),   // noon: azure
+        intArrayOf(0xFF8ED3AE.toInt(), 0xFF2192A4.toInt(), 0xFF0B4076.toInt()),   // afternoon: warm, greener
+        intArrayOf(0xFFE6B062.toInt(), 0xFF4A8AA6.toInt(), 0xFF133F72.toInt()),   // golden hour
         intArrayOf(0xFFFF8B5C.toInt(), 0xFFB2507E.toInt(), 0xFF24165C.toInt()),   // sunset: orange and magenta
         intArrayOf(0xFF7C4AAA.toInt(), 0xFF2F2C7A.toInt(), 0xFF0A0A36.toInt()),   // dusk: violet
         intArrayOf(0xFF27367C.toInt(), 0xFF121E52.toInt(), 0xFF03071E.toInt()),   // late dusk: indigo
@@ -649,6 +649,33 @@ private fun nebulaTile(n: Int, seed: Long, hue: Float): Bitmap {
     return Bitmap.createBitmap(px, n, n, Bitmap.Config.ARGB_8888)
 }
 
+/** Super's "day": the space behind everything changes with the hour, so night, dawn, noon and sunset each look like themselves. */
+private val SUPER_SPACE = Keys(floatArrayOf(0f, 4.8f, 6.2f, 8.8f, 12.4f, 15.6f, 17.9f, 19.2f, 20.8f),
+    arrayOf(
+        intArrayOf(0xFF010208.toInt(), 0xFF050820.toInt(), 0xFF0C0828.toInt()),   // night: almost black, a hint of indigo
+        intArrayOf(0xFF06061C.toInt(), 0xFF140A34.toInt(), 0xFF2A0C3C.toInt()),   // before dawn
+        intArrayOf(0xFF1E0A30.toInt(), 0xFF5A1848.toInt(), 0xFF8C3640.toInt()),   // dawn: plum to rose
+        intArrayOf(0xFF04163A.toInt(), 0xFF0A3A60.toInt(), 0xFF16606C.toInt()),   // morning: teal
+        intArrayOf(0xFF0A1658.toInt(), 0xFF22288A.toInt(), 0xFF3C2C9E.toInt()),   // noon: bright cobalt
+        intArrayOf(0xFF120838.toInt(), 0xFF2E0E58.toInt(), 0xFF4E1268.toInt()),   // afternoon: violet
+        intArrayOf(0xFF280820.toInt(), 0xFF6A142E.toInt(), 0xFFA4422A.toInt()),   // sunset: crimson to amber
+        intArrayOf(0xFF0E0830.toInt(), 0xFF26104C.toInt(), 0xFF40104E.toInt()),   // dusk: purple
+        intArrayOf(0xFF040418.toInt(), 0xFF0A0A2E.toInt(), 0xFF180A36.toInt()),   // late evening
+    ))
+
+/** The three colours of the gas clouds through the day. */
+private val SUPER_GAS = Keys(floatArrayOf(0f, 5.4f, 6.6f, 9f, 12.4f, 15.6f, 18f, 19.4f),
+    arrayOf(
+        intArrayOf(0xFF5A6CFF.toInt(), 0xFF3A9CFF.toInt(), 0xFF8A5CFF.toInt()),   // night: cold blues
+        intArrayOf(0xFFFF6AB4.toInt(), 0xFF9A6CFF.toInt(), 0xFFFF9A7A.toInt()),   // dawn: pink, lilac, peach
+        intArrayOf(0xFFFFB46A.toInt(), 0xFFFF6A9A.toInt(), 0xFFFFE08A.toInt()),   // sunrise: gold and coral
+        intArrayOf(0xFF4AF0D8.toInt(), 0xFF4AB4FF.toInt(), 0xFF9AFFB0.toInt()),   // morning: aqua and mint
+        intArrayOf(0xFF6AA0FF.toInt(), 0xFFB46AFF.toInt(), 0xFF5AF0FF.toInt()),   // noon: electric blue and violet
+        intArrayOf(0xFFC85AFF.toInt(), 0xFFFF5AC8.toInt(), 0xFF6A7AFF.toInt()),   // afternoon: magenta and violet
+        intArrayOf(0xFFFF5A3A.toInt(), 0xFFFFA83A.toInt(), 0xFFFF3A8A.toInt()),   // sunset: red, amber, rose
+        intArrayOf(0xFF9A4AFF.toInt(), 0xFFFF4A9A.toInt(), 0xFF4A5AFF.toInt()),   // dusk: purple and pink
+    ))
+
 class SuperScene(w: Int, h: Int) : Scene(w, h, 21) {
     private class Star(val x: Float, val y: Float, val r: Float, val ph: Float, val depth: Float, val warm: Float)
     private val stars = List(260) { Star(rnd.nextFloat() * w, rnd.nextFloat() * h, .5f + rnd.nextFloat() * 1.4f, rnd.nextFloat() * 6.28f, .25f + rnd.nextFloat() * .75f, rnd.nextFloat()) }
@@ -660,6 +687,7 @@ class SuperScene(w: Int, h: Int) : Scene(w, h, 21) {
     private val star = glowSprite(48, 0xFFFFFFFF.toInt(), 0x66FFFFFF, 0x00FFFFFF)
     private val ring = ringSprite(512)
     private var base: Bitmap? = null
+    private var baseKey = -1
     private val addPaint = Paint(Paint.FILTER_BITMAP_FLAG).apply { xfermode = ADD_MODE }
     private val plain = Paint(Paint.FILTER_BITMAP_FLAG)
     private class Ring(val x: Float, val y: Float, var age: Float, val hue: Float)
@@ -677,14 +705,16 @@ class SuperScene(w: Int, h: Int) : Scene(w, h, 21) {
 
     override fun tap(x: Float, y: Float) { rings.add(Ring(x, y, 0f, (time * 40f) % 360f)) }
 
-    private fun backdrop(): Bitmap {
-        if (base == null) {
-            val b = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888); val c = Canvas(b); val p = Paint()
-            p.shader = LinearGradient(0f, 0f, w * .4f, h.toFloat(), intArrayOf(0xFF04031A.toInt(), 0xFF120838.toInt(), 0xFF2A0C4E.toInt()), floatArrayOf(0f, .55f, 1f), Shader.TileMode.CLAMP)
+    private fun backdrop(hour: Float): Bitmap {
+        // Redrawn every few minutes of scene time as the colours move on, not every frame.
+        val key = (hour * 12f).toInt()
+        if (base == null || key != baseKey) {
+            val b = base ?: Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888); val c = Canvas(b); val p = Paint()
+            p.shader = LinearGradient(0f, 0f, w * .4f, h.toFloat(), intArrayOf(SUPER_SPACE.at(hour, 0), SUPER_SPACE.at(hour, 1), SUPER_SPACE.at(hour, 2)), floatArrayOf(0f, .55f, 1f), Shader.TileMode.CLAMP)
             c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), p)
             // a soft vignette keeps the eye in the middle
             p.shader = RadialGradient(w / 2f, h * .5f, m * .75f, Color.TRANSPARENT, 0x88000008.toInt(), Shader.TileMode.CLAMP); c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), p)
-            base = b
+            base = b; baseKey = key
         }
         return base!!
     }
@@ -700,10 +730,13 @@ class SuperScene(w: Int, h: Int) : Scene(w, h, 21) {
 
     override fun draw(c: Canvas, env: Env, cfg: SceneConfig) {
         val hueBase = (time * 4f + env.hour * 12f) % 360f
-        c.drawBitmap(backdrop(), 0f, 0f, null)
-        gas(c, gasA, 2.3f, time * .45f, hsv(255, hueBase, .35f, 1f), (185 + 30 * sin(time * .21f)).toInt(), sin(time * .05f) * m * .06f, cos(time * .04f) * m * .05f)
-        gas(c, gasB, 2.0f, -time * .6f + 40f, hsv(255, hueBase + 120f, .3f, 1f), (150 + 30 * sin(time * .17f + 2f)).toInt(), cos(time * .06f) * m * .08f, sin(time * .05f) * m * .06f)
-        gas(c, gasC, 1.6f, time * .8f + 90f, hsv(255, hueBase + 240f, .4f, 1f), (105 + 30 * sin(time * .27f + 4f)).toInt(), -sin(time * .07f) * m * .1f, cos(time * .06f) * m * .08f)
+        val night = nightness(env.hour); val day = 1f - night
+        // Faint gas and bright stars at night, full colourful clouds by day.
+        val gasK = .5f + .55f * day; val starK = .6f + .4f * night
+        c.drawBitmap(backdrop(env.hour), 0f, 0f, null)
+        gas(c, gasA, 2.3f, time * .45f, SUPER_GAS.at(env.hour, 0), ((185 + 30 * sin(time * .21f)) * gasK).toInt().coerceIn(0, 255), sin(time * .05f) * m * .06f, cos(time * .04f) * m * .05f)
+        gas(c, gasB, 2.0f, -time * .6f + 40f, SUPER_GAS.at(env.hour, 1), ((150 + 30 * sin(time * .17f + 2f)) * gasK).toInt().coerceIn(0, 255), cos(time * .06f) * m * .08f, sin(time * .05f) * m * .06f)
+        gas(c, gasC, 1.6f, time * .8f + 90f, SUPER_GAS.at(env.hour, 2), ((105 + 30 * sin(time * .27f + 4f)) * gasK).toInt().coerceIn(0, 255), -sin(time * .07f) * m * .1f, cos(time * .06f) * m * .08f)
         // stars at three depths drifting slowly, cooler and warmer ones
         src.set(0, 0, star.width, star.height)
         for (s in stars) {
@@ -711,7 +744,7 @@ class SuperScene(w: Int, h: Int) : Scene(w, h, 21) {
             val tw = .4f + .6f * (sin(time * 1.8f * s.depth + s.ph) * .5f + .5f)
             val r = s.r * 2.4f
             addPaint.colorFilter = android.graphics.PorterDuffColorFilter(blend(0xFFBFD4FF.toInt(), 0xFFFFE2B0.toInt(), s.warm), android.graphics.PorterDuff.Mode.MULTIPLY)
-            addPaint.alpha = (255 * tw * s.depth).toInt().coerceIn(0, 255); dst.set(s.x - r, y - r, s.x + r, y + r); c.drawBitmap(star, src, dst, addPaint)
+            addPaint.alpha = (255 * tw * s.depth * starK).toInt().coerceIn(0, 255); dst.set(s.x - r, y - r, s.x + r, y + r); c.drawBitmap(star, src, dst, addPaint)
         }
         addPaint.colorFilter = null
         // aurora: ribbons of rainbow light, each a wave that keeps flowing, drawn as three passes (wide and faint, then tight and bright)
