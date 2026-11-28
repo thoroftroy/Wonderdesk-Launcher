@@ -1,5 +1,10 @@
 # Launcher changelog
 
+## v0.11.1
+
+- The moving background holds still while Battery Saver is on, so it uses next to no power then. It still changes with what the app is doing
+- The animated wallpaper uses less power: it checks whether the phone is locked twice a second instead of twice per frame, and runs at half speed while Battery Saver is on
+
 ## v0.11.0
 
 - The floating button has a Passwords shortcut: it opens Vault's quick look, with the logins for the app you are in first. It is added once after Search to a menu you already set up

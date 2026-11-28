@@ -263,7 +263,24 @@ class WonderdeskWallpaper : WallpaperService() {
         private var videoTouched = false
         private var flip = false
 
-        private val frame = object : Runnable { override fun run() { if (!visible) return; drawFrame(); handler.postDelayed(this, if (needsFast()) 33 else 400) } }
+        private val frame = object : Runnable { override fun run() { if (!visible) return; drawFrame(); handler.postDelayed(this, if (!needsFast()) 400 else if (saver()) 66 else 33) } }
+
+        // Asking Android whether the phone is locked is a call to another process; once or twice a second is plenty.
+        private var keyguardAt = 0L
+        private var keyguardLocked = false
+        private fun keyguard(): Boolean {
+            val now = android.os.SystemClock.uptimeMillis()
+            if (now - keyguardAt > 400) { keyguardAt = now; keyguardLocked = runCatching { getSystemService(android.app.KeyguardManager::class.java)?.isKeyguardLocked == true }.getOrDefault(false) }
+            return keyguardLocked
+        }
+        private var saverAt = 0L
+        private var saverOn = false
+        /** Battery Saver: half the frame rate. */
+        private fun saver(): Boolean {
+            val now = android.os.SystemClock.uptimeMillis()
+            if (now - saverAt > 2000) { saverAt = now; saverOn = runCatching { getSystemService(android.os.PowerManager::class.java).isPowerSaveMode }.getOrDefault(false) }
+            return saverOn
+        }
         private val clock = object : Runnable { override fun run() { reselect(); handler.postDelayed(this, 60_000) } }
 
         private fun needsFast(): Boolean { val s = src ?: return false; return s.kind == "scene" || s.kind == "style" && s.id.startsWith("bubbles") || incoming != null }
@@ -289,7 +306,7 @@ class WonderdeskWallpaper : WallpaperService() {
         }
 
         override fun onVisibilityChanged(v: Boolean) {
-            visible = v
+            visible = v; keyguardAt = 0L   // look again straight away after showing or hiding
             handler.removeCallbacks(frame); handler.removeCallbacks(clock)
             if (v) {
                 reselect()
@@ -359,7 +376,7 @@ class WonderdeskWallpaper : WallpaperService() {
             val s = src ?: return
             val now = System.nanoTime(); val dt = ((now - last) / 1e9f).coerceIn(0f, .1f); last = now
             // Locking or unlocking the phone can switch the look.
-            val lockedPeek = runCatching { getSystemService(android.app.KeyguardManager::class.java)?.isKeyguardLocked == true }.getOrDefault(false)
+            val lockedPeek = keyguard()
             if (lockedPeek != lockedNow && !WpConfig.lockSame(this@WonderdeskWallpaper)) { src = null; reselect(); return }
             if (s.kind == "video") return   // the player owns the surface
             if (s.kind == "photos" && photos.size > 1) advanceSlideshow(dt)
@@ -376,7 +393,7 @@ class WonderdeskWallpaper : WallpaperService() {
                 incoming?.let { paint.alpha = (fade * 255).toInt().coerceIn(0, 255); c.drawBitmap(it, 0f, 0f, paint); paint.alpha = 255 }
                 field?.draw(c)
                 runner?.draw(c, sceneCfg)
-                if (isLock || (getSystemService(android.app.KeyguardManager::class.java)?.isKeyguardLocked == true)) LockDraw.draw(c, this@WonderdeskWallpaper, w, h, lockLook)
+                if (isLock || keyguard()) LockDraw.draw(c, this@WonderdeskWallpaper, w, h, lockLook)
             } finally { runCatching { holder.surface.unlockCanvasAndPost(c) } }
         }
 
